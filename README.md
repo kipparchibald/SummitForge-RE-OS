@@ -1,11 +1,11 @@
 # SummitForge RE OS
 
-... (existing content)
+... (previous content)
 
-## New Feature: Multi-Source Listing Import Trigger
-- Upload MLS CSV exports
-- Paste URLs or upload from Zillow, LandWatch, Lands of America, LandAndFarm
-- Auto-triggers raw land projections (lot yield, road estimates, pro formas)
-- Future: Scheduled monitoring of saved search URLs
+## Refined Features (July 2026 Update)
+- **Refined Parser**: Robust CSV/JSON/URL normalization for MLS, Zillow, LandWatch, Lands of America. Strong land filtering. Auto-triggers raw land projections.
+- **GIS-Based Monitoring**: Watched Areas using existing GIS data (PostGIS spatial queries on county parcels, zoning layers). No new drone data required. Detects new/changed land opportunities in defined geometries and triggers projections.
 
-See lib/import/listings.ts and app/import/page.tsx
+Add `papaparse` for better CSV support.
+
+See lib/import/listings.ts, lib/monitoring/gis-monitor.ts, and supabase/schema-updates.sql
