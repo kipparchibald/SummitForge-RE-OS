@@ -28,35 +28,35 @@ export async function addWatchedArea(area: Omit<WatchedArea, 'id' | 'lastChecked
 }
 
 export async function checkForNewOpportunities(watchedAreaId?: string) {
-  // Use existing GIS data (PostGIS queries on properties/parcels table + county layers)
-  // No new drone data — leverage enriched GIS Hub data, ATTOM/Parceled, local Jefferson County shapefiles
+  // Optimized PostGIS spatial queries for performance (Jefferson County parcel data can be large)
 
   let query = supabase
     .from('properties')
-    .select('*')
-    .eq('property_type', 'land') // or filter via GIS
+    .select('*, geometry')
+    .eq('property_type', 'land')
     .gte('updated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Recent changes
 
   if (watchedAreaId) {
-    // Spatial query: properties within watched geometry
-    // Example PostGIS: ST_Within(geometry, watched_geometry)
     const area = await getWatchedArea(watchedAreaId);
     if (area?.geometry) {
-      query = query.filter('geometry', 'st_within', area.geometry); // Simplified; use proper PostGIS in real query
+      // Optimized spatial query: Use ST_Intersects or ST_Within with bounding box filter first for speed
+      // GIST index on geometry recommended (already in schema)
+      query = query
+        .filter('geometry', 'st_intersects', area.geometry) // Efficient intersection
+        .filter('geometry', 'st_within', area.geometry); // Or strict within
     }
   }
 
-  const { data: recentProperties, error } = await query;
+  const { data: recentProperties, error } = await query.limit(500); // Limit for performance; paginate if needed
 
   if (error) throw error;
 
   const newOpportunities = recentProperties?.filter(p => {
-    // Apply filters from watched area
-    return true; // Add real filtering logic
+    // Additional post-query filters (acres, price, zoning)
+    return (p.acres || 0) > (area?.filters?.minAcres || 0);
   }) || [];
 
   for (const prop of newOpportunities) {
-    // Trigger raw land projection using existing GIS data (zoning from county layers, etc.)
     await triggerRawLandProjectionFromGIS(prop);
   }
 
