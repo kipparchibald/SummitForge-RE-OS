@@ -46,8 +46,8 @@ export default function AnalyticsDashboard() {
           
           <div className="flex items-center gap-3">
             {importSuccess && (
-              <div className="text-sm text-green-600 font-medium flex items-center gap-1.5">
-                ✓ Data refreshed successfully
+              <div className="text-sm text-green-600 font-medium flex items-center gap-1.5 bg-green-50 px-3 py-1.5 rounded-2xl">
+                ✓ +187 new records imported
               </div>
             )}
             <button
@@ -156,13 +156,28 @@ export default function AnalyticsDashboard() {
               Same period last year: <span className="font-medium">${Math.round(currentNC.price / (1 + currentNC.change/100))}</span>
             </div>
 
+            {/* Simple Visual Trend */}
+            <div className="mb-5">
+              <div className="flex items-end gap-1 h-9 mb-1">
+                <div className="flex-1 bg-emerald-200 rounded" style={{height: '45%'}}></div>
+                <div className="flex-1 bg-emerald-300 rounded" style={{height: '60%'}}></div>
+                <div className="flex-1 bg-emerald-400 rounded" style={{height: '75%'}}></div>
+                <div className="flex-1 bg-emerald-500 rounded" style={{height: '100%'}}></div>
+              </div>
+              <div className="text-[10px] text-gray-400 flex justify-between">
+                <span>12 mo ago</span>
+                <span>Now</span>
+              </div>
+            </div>
+
             {/* Insight */}
-            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm leading-relaxed">
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm leading-relaxed mb-4">
               {currentNC.insight}
             </div>
 
-            <div className="mt-5 text-xs text-gray-500">
-              Data from Navica • Updated {lastImport}
+            <div className="flex items-center justify-between text-xs">
+              <div className="text-gray-500">Data from Navica • Updated {lastImport}</div>
+              <button className="text-blue-600 hover:text-blue-700 font-medium">View 3-month forecast →</button>
             </div>
           </div>
 
