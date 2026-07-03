@@ -1,15 +1,23 @@
 # SummitForge RE OS
 
-... (previous updates)
+**Stellar All-in-One Real Estate Operating System** for agents, teams, brokerages, and developers — with deep focus on raw land, development, and construction in Eastern Idaho.
 
-## New Feature: Marketing Agent
+## Quick Start
+- `npm install`
+- Add Supabase + Mapbox keys to `.env.local`
+- `npm run dev`
 
-Live AI marketing agent added to the app:
-- Generates comprehensive marketing plans tailored to listings and raw land developments
-- Recommends channels, content strategy, timeline, and budget
-- One-click execution
-- Integrated with existing GIS, pro formas, and transaction tools
+## Key Features (Current)
+- GIS Monitoring + Interactive Map
+- Raw Land Analysis & Preliminary Plat Generation
+- Investment Pro Formas
+- Multi-source Listing Import
+- AI Marketing Agent
+- Transaction Coordinator
+- White-Label Branding Foundation (see /settings/branding)
 
-Access at /marketing
+## Comprehensive Analysis
+See `docs/FEATURE_ANALYSIS_WHITE_LABEL.md` for full feature roadmap, white-label strategy, and monetization opportunities.
 
-Smoke test passed.
+## White-Label Ready
+The platform is being built with multi-tenancy and branding in mind so it can be resold or used by other brokerages under their own brand.
