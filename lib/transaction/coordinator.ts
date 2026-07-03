@@ -1,6 +1,8 @@
 // Refined Transaction Coordinator for SummitForge
 // Handles full transaction workflow with AI assistance
 
+import { createIdahoFormsEngine } from '../forms/idaho-forms';
+
 export interface Transaction {
   id: string;
   propertyId: string;
@@ -34,28 +36,23 @@ export class TransactionCoordinator {
     return tx;
   }
 
-  updateStatus(txId: string, status: Transaction['status']) {
+  updateStatus(txId: string, status: Transaction['status']): void {
     const tx = this.transactions.get(txId);
     if (tx) {
       tx.status = status;
-      // AI trigger: e.g., generate next document or schedule
       this.triggerAIAction(tx);
     }
   }
 
   private triggerAIAction(tx: Transaction) {
-    // Refined AI actions based on status
     switch (tx.status) {
       case 'under_contract':
-        // Generate contract, send for signature (DocuSign)
         console.log(`[AI] Generating contract for ${tx.id}`);
         break;
       case 'inspection':
-        // Schedule inspection, track contingencies
         tx.timeline.inspectionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         break;
       case 'closing':
-        // Order title, schedule closing
         console.log(`[AI] Ordering title report for ${tx.id}`);
         break;
     }
@@ -65,14 +62,40 @@ export class TransactionCoordinator {
     return this.transactions.get(txId);
   }
 
-  // Enhanced: Add showing scheduler
-  scheduleShowing(txId: string, date: string) {
-    const tx = this.transactions.get(txId);
-    if (tx) {
-      tx.timeline.showingDate = date;
-      tx.notes.push(`Showing scheduled for ${date}`);
+  // ==================== IDAHO FORMS GENERATION ====================
+
+  generateIdahoForm(transactionId: string, formType: string, context: any = {}) {
+    const tx = this.transactions.get(transactionId);
+    if (!tx) return { success: false, error: 'Transaction not found' };
+
+    const mockProperty = { address: context.address || 'Sample Property', acres: context.acres || 0.6, zoning: 'Residential' };
+    const mockBuyer = { name: context.buyerName || 'Buyer Name' };
+    const mockSeller = { name: context.sellerName || 'Seller Name' };
+    const mockAgent = { name: 'Kipp Archibald', brokerage: 'Archibald-Bagley Real Estate' };
+
+    const engine = createIdahoFormsEngine(tx, mockProperty, mockBuyer, mockSeller, mockAgent);
+
+    let form;
+    switch (formType) {
+      case 'RE-21': form = engine.generateRE21(); break;
+      case 'RE-24': form = engine.generateRE24(); break;
+      case 'RE-22': form = engine.generateRE22(); break;
+      case 'RE-23': form = engine.generateRE23(); break;
+      case 'RE-14': form = engine.generateRE14(); break;
+      case 'RE-16': form = engine.generateRE16(); break;
+      case 'RE-25': form = engine.generateRE25(); break;
+      case 'RE-25A': form = engine.generateRE25A(); break;
+      case 'RE-26': form = engine.generateRE26(); break;
+      case 'LeadPaint': form = engine.generateLeadBasedPaint(); break;
+      case 'RE-11': form = engine.generateRE11(); break;
+      case 'RE-13': form = engine.generateRE13(); break;
+      case 'all': form = engine.generateAllCriticalForms(); break;
+      default: return { success: false, error: 'Unknown form type' };
     }
+
+    if (!tx.documents) tx.documents = [];
+    tx.documents.push({ type: formType, generatedAt: new Date().toISOString(), form });
+
+    return { success: true, form };
   }
 }
-
-export const transactionCoordinator = new TransactionCoordinator();
