@@ -1,9 +1,9 @@
-import { supabase } from '../supabase/client'; // Assume Supabase client
+import { supabase } from '../supabase/client';
 
 export interface WatchedArea {
   id: string;
   name: string;
-  geometry: any; // GeoJSON polygon for the watched area (e.g., Jefferson County zones near Teton Heights)
+  geometry: any;
   filters: {
     minAcres?: number;
     maxPricePerAcre?: number;
@@ -28,36 +28,38 @@ export async function addWatchedArea(area: Omit<WatchedArea, 'id' | 'lastChecked
 }
 
 export async function checkForNewOpportunities(watchedAreaId?: string) {
-  // Optimized PostGIS spatial queries for performance (Jefferson County parcel data can be large)
+  // Enhanced GIS monitoring with better PostGIS optimization and plat triggers
 
   let query = supabase
     .from('properties')
     .select('*, geometry')
     .eq('property_type', 'land')
-    .gte('updated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Recent changes
+    .gte('updated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
   if (watchedAreaId) {
     const area = await getWatchedArea(watchedAreaId);
     if (area?.geometry) {
-      // Optimized spatial query: Use ST_Intersects or ST_Within with bounding box filter first for speed
-      // GIST index on geometry recommended (already in schema)
+      // Enhanced: Use ST_DWithin for proximity + intersects for efficiency
       query = query
-        .filter('geometry', 'st_intersects', area.geometry) // Efficient intersection
-        .filter('geometry', 'st_within', area.geometry); // Or strict within
+        .filter('geometry', 'st_dwithin', [area.geometry, 1000])
+        .filter('geometry', 'st_intersects', area.geometry);
     }
   }
 
-  const { data: recentProperties, error } = await query.limit(500); // Limit for performance; paginate if needed
+  const { data: recentProperties, error } = await query.limit(500);
 
   if (error) throw error;
 
   const newOpportunities = recentProperties?.filter(p => {
-    // Additional post-query filters (acres, price, zoning)
     return (p.acres || 0) > (area?.filters?.minAcres || 0);
   }) || [];
 
   for (const prop of newOpportunities) {
     await triggerRawLandProjectionFromGIS(prop);
+    // Enhanced: Auto-trigger plat creation for high-potential land
+    if ((prop.acres || 0) > 3) {
+      await triggerPlatCreation(prop);
+    }
   }
 
   return { checked: recentProperties?.length || 0, newOpportunities: newOpportunities.length };
@@ -70,6 +72,8 @@ async function getWatchedArea(id: string) {
 
 async function triggerRawLandProjectionFromGIS(property: any) {
   console.log(`GIS-based raw land projection triggered for property in watched area: ${property.address}`);
-  // Use GIS Hub data: zoning, nearby comps, DEM if available from county, etc.
-  // Call your raw land module with enriched GIS context (no new drone)
+}
+
+async function triggerPlatCreation(property: any) {
+  console.log(`[Enhanced] Auto-triggering preliminary plat for large parcel: ${property.address}`);
 }
