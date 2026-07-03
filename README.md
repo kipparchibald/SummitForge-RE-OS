@@ -1,16 +1,15 @@
 # SummitForge RE OS
 
-... (previous content)
+... (previous updates)
 
-## Major Updates - Supabase + API Routes + Expanded Pro Formas
+## New Feature: Marketing Agent
 
-- Real Supabase data loading integrated in dashboard and monitoring
-- API Routes created:
-  - /api/monitoring/check
-  - /api/import/listings
-  - /api/analysis/proforma
-- Pro formas significantly expanded with sensitivity analysis, holding costs, and multi-family example
+Live AI marketing agent added to the app:
+- Generates comprehensive marketing plans tailored to listings and raw land developments
+- Recommends channels, content strategy, timeline, and budget
+- One-click execution
+- Integrated with existing GIS, pro formas, and transaction tools
 
-All features now have backend API support and real data connectivity.
+Access at /marketing
 
 Smoke test passed.
