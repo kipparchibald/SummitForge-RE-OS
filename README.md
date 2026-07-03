@@ -1,10 +1,13 @@
 # SummitForge RE OS
 
-... (previous)
+... (previous updates)
 
-## Latest Updates
-- Monitoring UI Dashboard (app/monitoring/page.tsx)
-- Listing Import Page integrated with parser + raw land triggers
-- Investment pro formas starter (raw land focused, expandable)
+## Latest Features Added
+- Supabase client integration (lib/supabase/client.ts)
+- Expanded investment pro formas (raw land with scenarios + cash-on-cash)
+- GIS Map Dashboard with parcel selection & one-click analysis
+- All integrated with import + monitoring pipeline
 
-Smoke test passed.
+Add your Supabase and Mapbox keys to .env.local
+
+Smoke test passed. Raw land focus maintained.
