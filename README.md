@@ -1,13 +1,16 @@
 # SummitForge RE OS
 
-... (previous updates)
+... (previous content)
 
-## Latest Features Added
-- Supabase client integration (lib/supabase/client.ts)
-- Expanded investment pro formas (raw land with scenarios + cash-on-cash)
-- GIS Map Dashboard with parcel selection & one-click analysis
-- All integrated with import + monitoring pipeline
+## Major Updates - Supabase + API Routes + Expanded Pro Formas
 
-Add your Supabase and Mapbox keys to .env.local
+- Real Supabase data loading integrated in dashboard and monitoring
+- API Routes created:
+  - /api/monitoring/check
+  - /api/import/listings
+  - /api/analysis/proforma
+- Pro formas significantly expanded with sensitivity analysis, holding costs, and multi-family example
 
-Smoke test passed. Raw land focus maintained.
+All features now have backend API support and real data connectivity.
+
+Smoke test passed.
