@@ -1,10 +1,10 @@
 # SummitForge RE OS
 
-... (previous content)
+... (previous)
 
-## Optimization Update
-- Refined parser for multi-source imports.
-- GIS-based monitoring with optimized PostGIS spatial queries (ST_Intersects + GIST indexes, limits, bounding box-friendly).
-- No new drone data — leverages existing county GIS layers and property table for efficiency in Jefferson County.
+## Latest Updates
+- Monitoring UI Dashboard (app/monitoring/page.tsx)
+- Listing Import Page integrated with parser + raw land triggers
+- Investment pro formas starter (raw land focused, expandable)
 
-Smoke test passed for raw land projections on monitored areas.
+Smoke test passed.

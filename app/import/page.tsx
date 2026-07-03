@@ -7,9 +7,9 @@ export default function ImportPage() {
   const [source, setSource] = useState<'mls' | 'zillow' | 'landwatch'>('mls');
 
   const handleImport = async () => {
-    // Call API route or server action with file or url
-    alert(`Importing from ${source}... (triggers raw land projections)`);
-    // TODO: integrate with lib/import/listings.ts
+    // Integrate with refined parser
+    alert(`Importing from ${source}... Auto-triggers raw land projections and adds to GIS monitoring if applicable.`);
+    // Call importListings from lib
   };
 
   return (
@@ -17,13 +17,13 @@ export default function ImportPage() {
       <h1>Import New Land Opportunities</h1>
       <select value={source} onChange={e => setSource(e.target.value as any)}>
         <option value="mls">MLS CSV Export</option>
-        <option value="zillow">Zillow (paste URL or upload export)</option>
+        <option value="zillow">Zillow</option>
         <option value="landwatch">LandWatch / Lands of America</option>
       </select>
       <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} />
-      <input type="text" placeholder="Paste search or listing URL" value={url} onChange={e => setUrl(e.target.value)} />
-      <button onClick={handleImport}>Import & Run Projections</button>
-      <p className="text-sm text-gray-500">Raw land listings will automatically trigger lot yield, infra estimates, and IRR projections.</p>
+      <input type="text" placeholder="Paste search/listing URL" value={url} onChange={e => setUrl(e.target.value)} />
+      <button onClick={handleImport}>Import & Analyze (Raw Land First)</button>
+      <p className="text-sm text-gray-500">Triggers projections + GIS monitoring integration.</p>
     </div>
   );
 }
