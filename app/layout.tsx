@@ -43,6 +43,12 @@ export default function RootLayout({
               <Link href="/import" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
                 Data Import
               </Link>
+              <Link href="/mortgage" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
+                Mortgage Calculator
+              </Link>
+              <Link href="/alerts" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
+                Property Alerts
+              </Link>
             </nav>
 
             <div className="mt-auto pt-8 border-t text-xs text-gray-400">
