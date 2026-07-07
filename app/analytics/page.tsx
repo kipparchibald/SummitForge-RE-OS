@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import PriceTrendChart from '@/components/PriceTrendChart';
 
 export default function AnalyticsDashboard() {
   const [lastImport, setLastImport] = useState('2026-06-15');
@@ -156,18 +157,19 @@ export default function AnalyticsDashboard() {
               Same period last year: <span className="font-medium">${Math.round(currentNC.price / (1 + currentNC.change/100))}</span>
             </div>
 
-            {/* Simple Visual Trend */}
-            <div className="mb-5">
-              <div className="flex items-end gap-1 h-9 mb-1">
-                <div className="flex-1 bg-emerald-200 rounded" style={{height: '45%'}}></div>
-                <div className="flex-1 bg-emerald-300 rounded" style={{height: '60%'}}></div>
-                <div className="flex-1 bg-emerald-400 rounded" style={{height: '75%'}}></div>
-                <div className="flex-1 bg-emerald-500 rounded" style={{height: '100%'}}></div>
-              </div>
-              <div className="text-[10px] text-gray-400 flex justify-between">
-                <span>12 mo ago</span>
-                <span>Now</span>
-              </div>
+            {/* Interactive Trend Chart */}
+            <div className="mb-6">
+              <PriceTrendChart 
+                data={[
+                  { month: 'Jul', price: 278 },
+                  { month: 'Sep', price: 285 },
+                  { month: 'Nov', price: 291 },
+                  { month: 'Jan', price: 299 },
+                  { month: 'Mar', price: 305 },
+                  { month: 'May', price: 312 },
+                ]} 
+                title="New Construction $/sq ft (Rigby + Ririe)"
+              />
             </div>
 
             {/* Insight */}
