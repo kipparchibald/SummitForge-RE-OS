@@ -1,4 +1,7 @@
-import { parse as parseCSV } from 'papaparse'; // Assume we'll add papaparse for robust CSV
+import { parse as parseCSV } from 'papaparse';
+import { findMatchesForListing } from '@/lib/alerts/matching';
+import { processMatchesForNotification } from '@/lib/alerts/notifications';
+import type { Alert, Listing as AlertListing } from '@/types/alerts';
 
 export interface NormalizedListing {
   source: string;
@@ -9,27 +12,37 @@ export interface NormalizedListing {
   propertyType: string;
   description?: string;
   url?: string;
-  geometry?: any; // GeoJSON if available
+  geometry?: any;
   rawData: any;
+  city?: string;
+  isNewConstruction?: boolean;
 }
 
-export async function importListings(input: File | string | any[], source: 'mls' | 'zillow' | 'landwatch' | 'landsofamerica' | 'other' = 'mls'): Promise<{ imported: number; listings: NormalizedListing[] }> {
+export async function importListings(
+  input: File | string | any[],
+  source: 'mls' | 'zillow' | 'landwatch' | 'landsofamerica' | 'other' = 'mls',
+  options?: {
+    alerts?: Alert[];
+    runMatching?: boolean;
+  }
+): Promise<{
+  imported: number;
+  listings: NormalizedListing[];
+  matches?: any[];
+  notifications?: any[];
+}> {
   let rawData: any[] = [];
 
   if (Array.isArray(input)) {
     rawData = input;
   } else if (typeof input === 'string') {
-    // URL or raw text/JSON
     if (input.startsWith('http')) {
-      // For URLs: In production, integrate Apify or scraper. For MVP, placeholder enrichment
       console.log(`Fetching/enriching from URL: ${input}`);
-      // Simulate or call enrichment service
-      rawData = [{ url: input, address: 'Parsed from URL', price: 0 }]; // Replace with real fetch
+      rawData = [{ url: input, address: 'Parsed from URL', price: 0 }];
     } else {
       try {
         rawData = JSON.parse(input);
       } catch {
-        // Assume CSV text
         rawData = parseCSVText(input);
       }
     }
@@ -46,23 +59,61 @@ export async function importListings(input: File | string | any[], source: 'mls'
     .map(row => normalizeRow(row, source))
     .filter(Boolean) as NormalizedListing[];
 
-  const landListings = normalized.filter(l => 
-    l.propertyType.toLowerCase().includes('land') || 
-    l.propertyType.toLowerCase().includes('vacant') ||
-    (l.acres && l.acres > 0.5)
+  // Optional: run alert matching when alerts are provided
+  let matches: any[] = [];
+  let notifications: any[] = [];
+
+  if (options?.runMatching && options.alerts && options.alerts.length > 0) {
+    const alertListings: AlertListing[] = normalized.map((n, idx) => ({
+      id: n.externalId || `imported_${idx}`,
+      mlsNumber: n.externalId || `imported_${idx}`,
+      address: n.address,
+      city: n.city || 'Unknown',
+      location: mapCityToLocation(n.city || n.address),
+      price: n.price,
+      acres: n.acres,
+      propertyType: mapPropertyType(n.propertyType),
+      isNewConstruction: n.isNewConstruction ?? false,
+      description: n.description,
+      importedAt: new Date().toISOString(),
+    }));
+
+    for (const listing of alertListings) {
+      const listingMatches = findMatchesForListing(listing, options.alerts);
+      matches.push(...listingMatches);
+    }
+
+    if (matches.length > 0) {
+      notifications = await processMatchesForNotification(
+        matches,
+        options.alerts,
+        alertListings
+      );
+      console.log(`[Import] Generated ${matches.length} matches and ${notifications.length} notification payloads`);
+    }
+  }
+
+  // Trigger land projections for land listings
+  const landListings = normalized.filter(
+    l =>
+      l.propertyType.toLowerCase().includes('land') ||
+      l.propertyType.toLowerCase().includes('vacant') ||
+      (l.acres && l.acres > 0.5)
   );
 
   for (const listing of landListings) {
-    // Trigger raw land projection (call your existing module)
     await triggerRawLandProjection(listing);
-    // TODO: Save to Supabase listings table with geometry if available
   }
 
-  return { imported: landListings.length, listings: landListings };
+  return {
+    imported: normalized.length,
+    listings: normalized,
+    matches,
+    notifications,
+  };
 }
 
 function parseCSVText(csvText: string): any[] {
-  // Robust CSV parsing with papaparse or simple split (add papaparse to package.json)
   const results = parseCSV(csvText, { header: true, skipEmptyLines: true });
   return results.data || [];
 }
@@ -74,19 +125,22 @@ function normalizeRow(row: any, source: string): NormalizedListing | null {
     const acres = parseFloat(row.acres || row['Acres'] || row['Lot Size'] || row['Total Acres'] || 0);
     const propertyType = row['Property Type'] || row.type || row['Home Type'] || 'Land';
     const description = row.description || row['Public Remarks'] || '';
+    const city = row.city || row.City || row['City'] || '';
 
     if (!address || price <= 0) return null;
 
     return {
       source,
-      externalId: row.id || row.zpid || row.pid || row['MLS #'],
+      externalId: row.id || row.zpid || row.pid || row['MLS #'] || row['MLS Number'],
       address,
+      city,
       price,
       acres: acres || undefined,
       propertyType,
       description,
       url: row.url || row['Listing URL'] || row.link,
-      rawData: row
+      isNewConstruction: /new construction|new build|spec/i.test(propertyType + ' ' + description),
+      rawData: row,
     };
   } catch (e) {
     console.error('Normalization error for row:', row, e);
@@ -94,9 +148,29 @@ function normalizeRow(row: any, source: string): NormalizedListing | null {
   }
 }
 
+function mapCityToLocation(city: string): any {
+  const normalized = (city || '').toLowerCase().trim();
+  if (normalized.includes('rigby')) return 'Rigby';
+  if (normalized.includes('ririe')) return 'Ririe';
+  if (normalized.includes('roberts')) return 'Roberts';
+  if (normalized.includes('hamer')) return 'Hamer';
+  if (normalized.includes('terreton') || normalized.includes('mud lake')) return 'Terreton';
+  if (normalized.includes('idaho falls')) return 'Idaho Falls Area';
+  return 'Other';
+}
+
+function mapPropertyType(type: string): any {
+  const t = (type || '').toLowerCase();
+  if (t.includes('single')) return 'Single Family';
+  if (t.includes('new') || t.includes('construction')) return 'New Construction';
+  if (t.includes('land') || t.includes('vacant')) return 'Land';
+  if (t.includes('farm') || t.includes('ranch')) return 'Farm/Ranch';
+  if (t.includes('multi')) return 'Multi-Family';
+  if (t.includes('commercial')) return 'Commercial';
+  return 'Single Family';
+}
+
 async function triggerRawLandProjection(listing: NormalizedListing) {
   console.log(`Triggering raw land projection for: ${listing.address}`);
-  // Integrate with your lib/analysis/raw-land.ts
-  // Example: await runRawLandProjection({ ...listing, zoning: 'R-1' /* from GIS */ });
-  // This will calculate lot yield, infra estimates, IRR etc.
+  // Integrate with lib/analysis or lib/development modules
 }
