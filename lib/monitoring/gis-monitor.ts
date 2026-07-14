@@ -36,8 +36,9 @@ export async function checkForNewOpportunities(watchedAreaId?: string) {
     .eq('property_type', 'land')
     .gte('updated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
+  let area = null;
   if (watchedAreaId) {
-    const area = await getWatchedArea(watchedAreaId);
+    area = await getWatchedArea(watchedAreaId);
     if (area?.geometry) {
       // Enhanced: Use ST_DWithin for proximity + intersects for efficiency
       query = query
@@ -51,7 +52,7 @@ export async function checkForNewOpportunities(watchedAreaId?: string) {
   if (error) throw error;
 
   const newOpportunities = recentProperties?.filter(p => {
-    return (p.acres || 0) > (area?.filters?.minAcres || 0);
+    return (p.acres || 0) > (area && area.filters ? area.filters.minAcres || 0 : 0);
   }) || [];
 
   for (const prop of newOpportunities) {
