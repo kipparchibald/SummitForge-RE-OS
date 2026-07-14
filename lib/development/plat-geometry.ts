@@ -10,6 +10,7 @@ export type LngLat = [number, number];
 
 export interface DesignParams {
   lotWidthFt: number; lotDepthFt: number; rowFt: number;
+  pavementFt?: number;   // paved surface width (Jefferson Co. standard: 60' ROW / 30' road)
   nsStreets: number; perimFt: number;
   source: string;        // "nearby-subdivisions" | "county-preset"
   sampleSize?: number;   // # of comparable lots learned from
@@ -68,7 +69,7 @@ export function defaultDesign(county: string): DesignParams {
   const p = presetFor(county);
   const lotWidthFt = p.frontageFtPerLot;
   const lotDepthFt = Math.max(80, Math.round((p.lotAcres * 43560) / lotWidthFt));
-  return { lotWidthFt, lotDepthFt, rowFt: p.urban ? 56 : 60, nsStreets: 1, perimFt: 40,
+  return { lotWidthFt, lotDepthFt, rowFt: p.rowFt, pavementFt: p.pavementFt, nsStreets: 1, perimFt: 40,
     source: 'county-preset', medianLotAcres: p.lotAcres };
 }
 
@@ -115,9 +116,15 @@ export function designPlat(ring: LngLat[], county?: string, design?: DesignParam
   const sx = (x: number) => pad + (x - minx) * scale;
   const sy = (y: number) => pad + (maxy - y) * scale;
   const bpath = 'M' + pts.map(p => `${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' L') + ' Z';
+  const PAV = D.pavementFt || Math.round(ROW * 0.5);
+  const rowW = Math.max(1, ROW * scale).toFixed(1);
+  const pavW = Math.max(0.8, PAV * scale).toFixed(1);
   const roadSvg = [
-    ...ew.map(cy => `<line x1="${sx(minx).toFixed(1)}" y1="${sy(cy).toFixed(1)}" x2="${sx(maxx).toFixed(1)}" y2="${sy(cy).toFixed(1)}" stroke="#e3dcc6" stroke-width="${Math.max(1, ROW * scale).toFixed(1)}"/>`),
-    ...nsX.map(cx => `<line x1="${sx(cx).toFixed(1)}" y1="${sy(miny).toFixed(1)}" x2="${sx(cx).toFixed(1)}" y2="${sy(maxy).toFixed(1)}" stroke="#e3dcc6" stroke-width="${Math.max(1, ROW * scale).toFixed(1)}"/>`),
+    // 60' ROW band (light) then 30' pavement (darker) — e.g. Jefferson Co. standard
+    ...ew.map(cy => `<line x1="${sx(minx).toFixed(1)}" y1="${sy(cy).toFixed(1)}" x2="${sx(maxx).toFixed(1)}" y2="${sy(cy).toFixed(1)}" stroke="#ece5cf" stroke-width="${rowW}"/>`),
+    ...nsX.map(cx => `<line x1="${sx(cx).toFixed(1)}" y1="${sy(miny).toFixed(1)}" x2="${sx(cx).toFixed(1)}" y2="${sy(maxy).toFixed(1)}" stroke="#ece5cf" stroke-width="${rowW}"/>`),
+    ...ew.map(cy => `<line x1="${sx(minx).toFixed(1)}" y1="${sy(cy).toFixed(1)}" x2="${sx(maxx).toFixed(1)}" y2="${sy(cy).toFixed(1)}" stroke="#b9ac86" stroke-width="${pavW}"/>`),
+    ...nsX.map(cx => `<line x1="${sx(cx).toFixed(1)}" y1="${sy(miny).toFixed(1)}" x2="${sx(cx).toFixed(1)}" y2="${sy(maxy).toFixed(1)}" stroke="#b9ac86" stroke-width="${pavW}"/>`),
   ].join('');
   const lotSvg = lots.map(l => {
     const x0 = l.rect[0][0], y0 = l.rect[0][1], x1 = l.rect[2][0], y1 = l.rect[2][1];

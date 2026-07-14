@@ -61,11 +61,12 @@ export async function deriveDesignFromComps(lat: number, lng: number, county: st
   const medAcres = median(acresArr);
   const medWidth = Math.max(40, Math.round(median(widthArr)));
   const lotDepthFt = Math.max(80, Math.round((medAcres * 43560) / medWidth));
-  const urban = presetFor(county).urban || medAcres < 0.6;
+  const p = presetFor(county);
   return {
     lotWidthFt: medWidth,
     lotDepthFt,
-    rowFt: urban ? 56 : 60,               // ISPWC local street; ROW not derivable from lot polygons
+    rowFt: p.rowFt,          // adopted county standard (Jefferson: 60' ROW); not derivable from lot polygons
+    pavementFt: p.pavementFt, // Jefferson: 30' road
     nsStreets: 1,
     perimFt: 40,
     source: 'nearby-subdivisions',

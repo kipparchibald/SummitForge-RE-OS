@@ -8,16 +8,19 @@ export interface CountyPreset {
   key: string; label: string;
   lotAcres: number; roadFactor: number; frontageFtPerLot: number;
   urban: boolean; lotPrice: number; absorption: number; // lots/month
+  rowFt: number;        // right-of-way width (local street standard)
+  pavementFt: number;   // paved driving surface width
 }
 
 // Calibrated to 2026 eastern-Idaho comps (balanced-to-buyer market). See Market_Analysis.
+// ROW/pavement are the adopted local-street standards (Jefferson Co. confirmed 60' ROW / 30' road).
 export const COUNTY_PRESETS: Record<string, CountyPreset> = {
-  Jefferson:    { key: 'Jefferson',    label: 'Jefferson Co. R-1 (1 ac rural)',   lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 125000, absorption: 3 },
-  Bonneville:   { key: 'Bonneville',   label: 'Bonneville Co. R-1 (~0.33 ac)',    lotAcres: 0.33, roadFactor: 0.19, frontageFtPerLot: 100, urban: true,  lotPrice: 110000, absorption: 4 },
-  Madison:      { key: 'Madison',      label: 'Madison Co. R-1 (~0.33 ac)',       lotAcres: 0.33, roadFactor: 0.19, frontageFtPerLot: 100, urban: true,  lotPrice: 100000, absorption: 4 },
-  Bingham:      { key: 'Bingham',      label: 'Bingham Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 100000, absorption: 2 },
-  Fremont:      { key: 'Fremont',      label: 'Fremont Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 95000,  absorption: 2 },
-  Default:      { key: 'Default',      label: 'Generic R-1 (1 ac)',               lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 110000, absorption: 3 },
+  Jefferson:    { key: 'Jefferson',    label: 'Jefferson Co. R-1 (1 ac rural)',   lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 125000, absorption: 3, rowFt: 60, pavementFt: 30 },
+  Bonneville:   { key: 'Bonneville',   label: 'Bonneville Co. R-1 (~0.33 ac)',    lotAcres: 0.33, roadFactor: 0.19, frontageFtPerLot: 100, urban: true,  lotPrice: 110000, absorption: 4, rowFt: 60, pavementFt: 32 },
+  Madison:      { key: 'Madison',      label: 'Madison Co. R-1 (~0.33 ac)',       lotAcres: 0.33, roadFactor: 0.19, frontageFtPerLot: 100, urban: true,  lotPrice: 100000, absorption: 4, rowFt: 60, pavementFt: 32 },
+  Bingham:      { key: 'Bingham',      label: 'Bingham Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 100000, absorption: 2, rowFt: 60, pavementFt: 30 },
+  Fremont:      { key: 'Fremont',      label: 'Fremont Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 95000,  absorption: 2, rowFt: 60, pavementFt: 30 },
+  Default:      { key: 'Default',      label: 'Generic R-1 (1 ac)',               lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 110000, absorption: 3, rowFt: 60, pavementFt: 30 },
 };
 
 // Eastern-Idaho city -> county (unincorporated default). Extend as needed.
