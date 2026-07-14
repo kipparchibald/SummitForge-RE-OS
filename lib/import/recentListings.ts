@@ -3,60 +3,14 @@
 
 import { NormalizedListing, fuzzyFilterListings } from './listings';
 import { getListingsFromSupabase } from '../supabase/client';
+import { setLastSyncTimestamp } from './lastSync';
+
+// Timestamp helpers now live in the dependency-free './lastSync' module so that
+// client pages needing only the badge don't pull in Supabase. Re-exported here
+// for existing import sites.
+export { setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from './lastSync';
 
 let recentListings: NormalizedListing[] = [];
-
-/**
- * Shared "last Navica pull" timestamp mechanism (hoisted early).
- * localStorage (client) + memory. Updated on every Navica pull via setRecentListings or explicit calls.
- */
-let lastSyncTimestamp: string | null = null;
-
-export function setLastSyncTimestamp(isoTimestamp?: string) {
-  const ts = isoTimestamp || new Date().toISOString();
-  lastSyncTimestamp = ts;
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('summitforge_last_navica_pull', ts);
-    } catch (e) {}
-  }
-}
-
-export function getLastSyncTimestamp(): string | null {
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('summitforge_last_navica_pull');
-      if (stored) {
-        lastSyncTimestamp = stored;
-        return stored;
-      }
-    } catch (e) {}
-  }
-  return lastSyncTimestamp;
-}
-
-export function formatLastSyncTime(iso?: string | null): string {
-  const ts = iso || getLastSyncTimestamp();
-  if (!ts) return '';
-  try {
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
-export function isLastSyncRecent(iso?: string | null): boolean {
-  const ts = iso || getLastSyncTimestamp();
-  if (!ts) return false;
-  try {
-    const then = new Date(ts).getTime();
-    const now = Date.now();
-    return (now - then) < 60 * 60 * 1000; // 60 min window for "green"
-  } catch {
-    return false;
-  }
-}
 
 export function setRecentListings(listings: NormalizedListing[]) {
   recentListings = listings.slice(0, 200); // cap
@@ -123,9 +77,12 @@ export async function syncRecentListingsFromSupabase(): Promise<NormalizedListin
   return [...recentListings];
 }
 
-// Auto-sync from DB on module load (fire-and-forget).
-// Works reliably on server; browsers will populate after first live import + save.
-syncRecentListingsFromSupabase();
+// Auto-sync from DB on module load (fire-and-forget), server-side only.
+// In the browser this made a failing Supabase request on every page that
+// imported this module; the client populates after the first live import + save.
+if (typeof window === 'undefined') {
+  syncRecentListingsFromSupabase();
+}
 
 // Back-compat alias
 export const syncRecentFromSupabase = syncRecentListingsFromSupabase;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Map, { Marker, Popup } from 'react-map-gl'; // Mapbox GL
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from '@/lib/import/recentListings';
+import { setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from '@/lib/import/lastSync';
 
 // Must be read as a full static reference for Next to inline it into the client bundle.
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
