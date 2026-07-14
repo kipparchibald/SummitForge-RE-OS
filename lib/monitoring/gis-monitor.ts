@@ -51,8 +51,19 @@ export async function checkForNewOpportunities(watchedAreaId?: string) {
 
   if (error) throw error;
 
-  const newOpportunities = recentProperties?.filter(p => {
-    return (p.acres || 0) > (area && area.filters ? area.filters.minAcres || 0 : 0);
+  const filters = area?.filters;
+  const newOpportunities = recentProperties?.filter((p: any) => {
+    const acres = p.acres || 0;
+    // Apply every declared filter, not just minAcres. Use >= so a parcel exactly
+    // at the threshold qualifies.
+    if (filters?.minAcres != null && acres < filters.minAcres) return false;
+    if (filters?.maxPricePerAcre != null && acres > 0 && p.price != null) {
+      if (p.price / acres > filters.maxPricePerAcre) return false;
+    }
+    if (filters?.zoning && filters.zoning.length > 0) {
+      if (!p.zoning || !filters.zoning.includes(p.zoning)) return false;
+    }
+    return true;
   }) || [];
 
   for (const prop of newOpportunities) {

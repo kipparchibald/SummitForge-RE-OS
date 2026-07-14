@@ -16,6 +16,72 @@ interface ImportedListing {
   _score?: number;
 }
 
+// Module-scope so its identity is stable across ImportPage renders. When this
+// was defined inside the component, every keystroke gave it a new identity and
+// React remounted the subtree, so the search input lost focus after each letter.
+const SearchFilters = ({
+  searchTerm, setSearchTerm, minAcres, setMinAcres, maxPrice, setMaxPrice,
+  locationFilter, setLocationFilter, sortBy, setSortBy, useFuzzy, setUseFuzzy,
+  onClear, onSemanticAI, isLoading, isSearching, lastSearchSource
+}: any) => (
+  <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm w-full md:w-auto">
+    <input
+      type="text"
+      placeholder="Search address, MLS #, description..."
+      value={searchTerm}
+      onChange={e => setSearchTerm(e.target.value)}
+      className="border p-2 rounded col-span-2 md:col-span-2"
+    />
+    <input
+      type="number"
+      placeholder="Min acres"
+      value={minAcres}
+      onChange={e => setMinAcres(e.target.value)}
+      className="border p-2 rounded"
+    />
+    <input
+      type="number"
+      placeholder="Max price $"
+      value={maxPrice}
+      onChange={e => setMaxPrice(e.target.value)}
+      className="border p-2 rounded"
+    />
+    <select
+      value={locationFilter}
+      onChange={e => setLocationFilter(e.target.value)}
+      className="border p-2 rounded"
+    >
+      <option value="">All locations</option>
+      <option value="rigby">Rigby</option>
+      <option value="blackfoot">Blackfoot</option>
+      <option value="shelley">Shelley</option>
+      <option value="terreton">Terreton / Jefferson</option>
+    </select>
+    <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="border p-2 rounded">
+      <option value="acres-desc">Sort: Acres ↓</option>
+      <option value="score">Sort: Relevance ↓</option>
+      <option value="price-asc">Price ↑</option>
+      <option value="price-desc">Price ↓</option>
+    </select>
+    <button onClick={onClear} className="text-xs border px-2 py-1 rounded hover:bg-gray-50">Clear</button>
+
+    <div className="col-span-2 md:col-span-6 flex items-center gap-3 mt-1 flex-wrap">
+      <label className="flex items-center gap-1 text-xs cursor-pointer">
+        <input type="checkbox" checked={useFuzzy} onChange={e => setUseFuzzy(e.target.checked)} />
+        Use fuzzy (Levenshtein + score) + MLS/desc
+      </label>
+      <button
+        onClick={onSemanticAI}
+        disabled={isLoading || isSearching}
+        className="text-xs px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60"
+      >
+        🧠 Semantic Search with AI
+      </button>
+      <span className="text-[10px] text-gray-400">{isSearching ? 'Searching DB live...' : lastSearchSource}</span>
+    </div>
+  </div>
+);
+
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
@@ -248,70 +314,6 @@ export default function ImportPage() {
   };
 
   // AI Semantic Search tie-in: calls /api/ai/council with search term for matching listings
-  // Reusable Search Component (extracted for reuse in other pages / portal etc.)
-  const SearchFilters = ({
-    searchTerm, setSearchTerm, minAcres, setMinAcres, maxPrice, setMaxPrice,
-    locationFilter, setLocationFilter, sortBy, setSortBy, useFuzzy, setUseFuzzy,
-    onClear, onSemanticAI, isLoading, isSearching, lastSearchSource
-  }: any) => (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm w-full md:w-auto">
-      <input 
-        type="text" 
-        placeholder="Search address, MLS #, description..." 
-        value={searchTerm} 
-        onChange={e => setSearchTerm(e.target.value)}
-        className="border p-2 rounded col-span-2 md:col-span-2" 
-      />
-      <input 
-        type="number" 
-        placeholder="Min acres" 
-        value={minAcres} 
-        onChange={e => setMinAcres(e.target.value)}
-        className="border p-2 rounded" 
-      />
-      <input 
-        type="number" 
-        placeholder="Max price $" 
-        value={maxPrice} 
-        onChange={e => setMaxPrice(e.target.value)}
-        className="border p-2 rounded" 
-      />
-      <select 
-        value={locationFilter} 
-        onChange={e => setLocationFilter(e.target.value)}
-        className="border p-2 rounded"
-      >
-        <option value="">All locations</option>
-        <option value="rigby">Rigby</option>
-        <option value="blackfoot">Blackfoot</option>
-        <option value="shelley">Shelley</option>
-        <option value="tereton">Terreton / Jefferson</option>
-      </select>
-      <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="border p-2 rounded">
-        <option value="acres-desc">Sort: Acres ↓</option>
-        <option value="score">Sort: Relevance ↓</option>
-        <option value="price-asc">Price ↑</option>
-        <option value="price-desc">Price ↓</option>
-      </select>
-      <button onClick={onClear} className="text-xs border px-2 py-1 rounded hover:bg-gray-50">Clear</button>
-
-      <div className="col-span-2 md:col-span-6 flex items-center gap-3 mt-1 flex-wrap">
-        <label className="flex items-center gap-1 text-xs cursor-pointer">
-          <input type="checkbox" checked={useFuzzy} onChange={e => setUseFuzzy(e.target.checked)} /> 
-          Use fuzzy (Levenshtein + score) + MLS/desc
-        </label>
-        <button 
-          onClick={onSemanticAI} 
-          disabled={isLoading || isSearching}
-          className="text-xs px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60"
-        >
-          🧠 Semantic Search with AI
-        </button>
-        <span className="text-[10px] text-gray-400">{isSearching ? 'Searching DB live...' : lastSearchSource}</span>
-      </div>
-    </div>
-  );
-
   const handleSemanticSearchWithAI = async () => {
     const term = searchTerm || 'land parcels in Jefferson County';
     setIsLoading(true);

@@ -45,7 +45,7 @@ export default function AnalyticsDashboard() {
       setLastImport(newDate);
 
       if (data.listings && data.listings.length > 0) {
-        setRecordCount(prev => Math.max(prev, 12487) + data.landCount || 85);
+        setRecordCount(prev => Math.max(prev, 12487) + (data.landCount || 85));
         setSampleListings(data.listings.slice(0, 5).map((l: any) => ({
           address: l.address,
           price: l.price,

@@ -159,7 +159,7 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
        l.propertyType.toLowerCase().includes('vacant') ||
        (l.acres && l.acres > 0.5)) &&
       (l.address.toLowerCase().includes('rigby') ||
-       l.address.toLowerCase().includes('tereton') ||
+       l.address.toLowerCase().includes('terreton') ||
        l.address.toLowerCase().includes('blackfoot') ||
        l.address.toLowerCase().includes('shelley') ||
        l.address.toLowerCase().includes('jefferson'))
@@ -220,14 +220,16 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
       row.Location ||
       '';
 
-    const price = parseFloat(
-      row['List Price'] ||
-      row.ListPrice ||
-      row.price ||
-      row['Asking Price'] ||
-      row['OriginalListPrice'] ||
-      0
-    );
+    // Strip currency symbols / thousands separators before parsing, otherwise a
+    // value like "$450,000" yields NaN, which slips past the `price <= 0` guard.
+    const rawPrice =
+      row['List Price'] ??
+      row.ListPrice ??
+      row.price ??
+      row['Asking Price'] ??
+      row['OriginalListPrice'] ??
+      0;
+    const price = parseFloat(String(rawPrice).replace(/[^0-9.\-]/g, ''));
 
     const acres =
       parseFloat(
@@ -255,7 +257,7 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
 
     const mlsId = row['MLS #'] || row.MlsId || row['ListingId'] || row['ListingKey'] || row.id;
 
-    if (!fullAddress || price <= 0) return null;
+    if (!fullAddress || !Number.isFinite(price) || price <= 0) return null;
 
     return {
       source,

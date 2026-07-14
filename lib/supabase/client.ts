@@ -72,9 +72,16 @@ export async function saveListings(listings: any[]): Promise<{ saved: number; er
 
   if (rows.length === 0) return { saved: 0 };
 
+  // Postgres ON CONFLICT rejects a batch that targets the same conflict key twice
+  // ("cannot affect row a second time"), which would fail the entire save. Collapse
+  // duplicate external_ids first, keeping the last occurrence.
+  const deduped = Array.from(
+    rows.reduce((m, r) => m.set(r.external_id, r), new Map<string, typeof rows[number]>()).values()
+  );
+
   const { error } = await client
     .from('listings')
-    .upsert(rows, { onConflict: 'external_id' });
+    .upsert(deduped, { onConflict: 'external_id' });
 
   if (error) {
     console.error('[Supabase] saveListings error:', error);
