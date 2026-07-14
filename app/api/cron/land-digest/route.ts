@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scanLandDeals } from '@/lib/development/land-scan';
 import { getSupabaseAdmin } from '@/lib/supabase/client';
+import { authorizeCron } from '@/lib/auth/cron';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,8 @@ export const dynamic = 'force-dynamic';
  * if RESEND_API_KEY + DIGEST_TO + DIGEST_FROM are set, emails a digest.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  // Fail-closed in production; open only in demo mode. See lib/auth/cron.ts.
+  if (!authorizeCron(request).ok) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
@@ -34,9 +35,12 @@ export async function GET(request: NextRequest) {
     const key = process.env.RESEND_API_KEY, to = process.env.DIGEST_TO, from = process.env.DIGEST_FROM;
     let emailed = false;
     if (key && to && from && result.penciling.length) {
+      const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+      ));
       const rowsHtml = result.penciling.slice(0, 25).map((d, i) => `
         <tr style="background:${i % 2 ? '#f2f6f8' : '#fff'}">
-          <td style="padding:6px 8px">${d.address}</td><td style="padding:6px 8px">${d.county}</td>
+          <td style="padding:6px 8px">${esc(d.address)}</td><td style="padding:6px 8px">${esc(d.county)}</td>
           <td style="padding:6px 8px;text-align:right">${d.acres} ac</td><td style="padding:6px 8px;text-align:right">${d.lots}</td>
           <td style="padding:6px 8px;text-align:right">$${Math.round(d.price).toLocaleString()}</td>
           <td style="padding:6px 8px;text-align:right">$${Math.round(d.maxOffer).toLocaleString()}</td>
@@ -68,6 +72,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[land-digest] failed:', error);
-    return NextResponse.json({ success: false, error: error?.message || String(error) }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Land digest failed' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchArchibaldNavicaListings } from '@/lib/import/navica';
 import { saveListings } from '@/lib/supabase/client';
 import { setRecentListings } from '@/lib/import/recentListings';
+import { authorizeCron } from '@/lib/auth/cron';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +18,8 @@ export const dynamic = 'force-dynamic';
  * Always works in DEMO mode (falls back to rich Jefferson County demo listings inside fetchArchibaldNavicaListings).
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  // Secure only when secret is configured. Allows DEMO/local when unset.
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fail-closed in production; open only in demo mode. See lib/auth/cron.ts.
+  if (!authorizeCron(request).ok) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -54,7 +52,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[Cron Navica] Sync failed:', error);
     return NextResponse.json(
-      { success: false, error: 'Navica sync failed', details: error?.message || String(error) },
+      { success: false, error: 'Navica sync failed' },
       { status: 500 }
     );
   }

@@ -2,6 +2,7 @@ import { parse as parseCSV } from 'papaparse';
 import { fetchArchibaldNavicaListings } from './navica';
 import { setRecentListings } from './recentListings';
 import { saveListings } from '../supabase/client';
+import { safeFetch } from '../net/safeFetch';
 
 export interface NormalizedListing {
   source: string;
@@ -41,7 +42,7 @@ export async function importListings(
     if (input.startsWith('http')) {
       console.log(`[Import] Fetching from URL: ${input}`);
       try {
-        const res = await fetch(input);
+        const res = await safeFetch(input);
         const text = await res.text();
         if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
           rawData = JSON.parse(text);
