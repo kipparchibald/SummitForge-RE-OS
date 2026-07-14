@@ -50,7 +50,13 @@ export async function createPreliminaryPlat(property: any, zoningRules: any = {}
       properties: { lotNumber: lot.lotNumber, acres: lot.acres },
       geometry: {
         type: "Polygon",
-        coordinates: [[[property.lng || -112, property.lat || 43.7], ...]] // Placeholder
+        coordinates: [[
+          [property.lng || -112, property.lat || 43.7],
+          [property.lng || -112, (property.lat || 43.7) + 0.01],
+          [(property.lng || -112) + 0.01, (property.lat || 43.7) + 0.01],
+          [(property.lng || -112) + 0.01, property.lat || 43.7],
+          [property.lng || -112, property.lat || 43.7]
+        ]]
       }
     }))
   };
