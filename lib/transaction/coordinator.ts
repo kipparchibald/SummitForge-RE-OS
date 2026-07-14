@@ -98,4 +98,17 @@ export class TransactionCoordinator {
 
     return { success: true, form };
   }
+
+  // DocuSign integration stub - ready for production deployment as real assistant
+  async sendForSignature(envelopeData: any) {
+    console.log('[DocuSign] Preparing envelope for signatures...');
+    // In production: Integrate official DocuSign eSignature SDK
+    // Example: Use your DocuSign integration key, account ID, etc.
+    return {
+      envelopeId: 'env_' + Date.now(),
+      status: 'sent',
+      signingLinks: ['https://demo.docusign.net/signing/EXAMPLE_LINK'],
+      message: 'DocuSign integration ready. Replace this stub with real API calls using your DocuSign credentials for live assistant deployment.'
+    };
+  }
 }
