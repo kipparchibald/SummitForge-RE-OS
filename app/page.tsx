@@ -1,0 +1,159 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import RecentMatches from '@/components/RecentMatches';
+import { getStoredAlerts, getStoredMatches } from '@/lib/alerts/store';
+import { applyBrandTokens, DEFAULT_BRAND } from '@/lib/theme/tokens';
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState({
+    activeAlerts: 0,
+    totalMatches: 0,
+    unreadMatches: 0,
+  });
+
+  useEffect(() => {
+    // Apply branding tokens on load
+    applyBrandTokens(DEFAULT_BRAND);
+
+    const alerts = getStoredAlerts();
+    const matches = getStoredMatches();
+    setStats({
+      activeAlerts: alerts.filter(a => a.active).length,
+      totalMatches: matches.length,
+      unreadMatches: matches.filter(m => !m.notified).length,
+    });
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[var(--sf-bg,#f9fafb)]">
+      {/* Top Header */}
+      <header className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Command Center</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Archibald-Bagley • Jefferson County, ID</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Agent Online
+          </span>
+          <Link
+            href="/alerts"
+            className="px-4 py-2 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition"
+          >
+            + New Alert
+          </Link>
+        </div>
+      </header>
+
+      <div className="p-8 space-y-8">
+        {/* Stats Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard label="Active Alerts" value={stats.activeAlerts} href="/alerts" accent="emerald" />
+          <StatCard label="Total Matches" value={stats.totalMatches} href="/alerts" accent="blue" />
+          <StatCard label="Unread Matches" value={stats.unreadMatches} href="/alerts" accent="amber" />
+          <StatCard label="Open Transactions" value={0} href="/transactions" accent="purple" />
+        </div>
+
+        {/* Main Split */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Left 2/3 - Recent Matches */}
+          <div className="xl:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Recent Matches</h2>
+              <Link href="/alerts" className="text-sm text-emerald-600 hover:underline">
+                View all →
+              </Link>
+            </div>
+            <RecentMatches limit={8} />
+          </div>
+
+          {/* Right 1/3 - Quick Actions + Activity */}
+          <div className="space-y-6">
+            <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+              <div className="space-y-2">
+                <QuickLink href="/import" label="Import Navica CSV" desc="Trigger matching on new listings" />
+                <QuickLink href="/transactions" label="Transaction Coordinator" desc="Track deals & generate forms" />
+                <QuickLink href="/cma" label="CMA Builder" desc="Comparative market analysis" />
+                <QuickLink href="/land" label="Land Development" desc="Plat & utility estimates" />
+                <QuickLink href="/marketing" label="Marketing Agent" desc="Campaign plans & execution" />
+                <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe price trends" />
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+              <h3 className="font-semibold text-gray-900 mb-3">System Status</h3>
+              <div className="space-y-3 text-sm">
+                <StatusRow label="Matching Engine" status="ready" />
+                <StatusRow label="SMS Notifications" status="ready" />
+                <StatusRow label="Supabase" status="optional" />
+                <StatusRow label="Idaho Forms" status="ready" />
+                <StatusRow label="GIS Monitor" status="ready" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  href,
+  accent,
+}: {
+  label: string;
+  value: number;
+  href: string;
+  accent: 'emerald' | 'blue' | 'amber' | 'purple';
+}) {
+  const colors = {
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    purple: 'bg-purple-50 text-purple-700 border-purple-100',
+  };
+  return (
+    <Link
+      href={href}
+      className={`block border rounded-3xl p-5 ${colors[accent]} hover:shadow-md transition`}
+    >
+      <div className="text-3xl font-bold tracking-tight">{value}</div>
+      <div className="text-sm mt-1 opacity-80">{label}</div>
+    </Link>
+  );
+}
+
+function QuickLink({ href, label, desc }: { href: string; label: string; desc: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-start gap-3 p-3 rounded-2xl hover:bg-gray-50 transition group"
+    >
+      <div className="w-2 h-2 mt-1.5 rounded-full bg-gray-300 group-hover:bg-black transition" />
+      <div>
+        <div className="font-medium text-gray-900 text-sm">{label}</div>
+        <div className="text-xs text-gray-500">{desc}</div>
+      </div>
+    </Link>
+  );
+}
+
+function StatusRow({ label, status }: { label: string; status: 'ready' | 'optional' | 'todo' }) {
+  const map = {
+    ready: { text: 'Ready', class: 'text-emerald-600' },
+    optional: { text: 'Optional', class: 'text-amber-600' },
+    todo: { text: 'Todo', class: 'text-gray-400' },
+  };
+  return (
+    <div className="flex justify-between items-center">
+      <span className="text-gray-600">{label}</span>
+      <span className={`font-medium ${map[status].class}`}>{map[status].text}</span>
+    </div>
+  );
+}

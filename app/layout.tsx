@@ -3,9 +3,23 @@ import './globals.css';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Summit Forge',
-  description: 'Real Estate Analytics & Operations Platform for Jefferson County, ID',
+  title: 'Summit Forge — Archibald-Bagley',
+  description: 'AI Real Estate Operating System for Jefferson County, Idaho',
 };
+
+const nav = [
+  { href: '/', label: 'Dashboard' },
+  { href: '/analytics', label: 'Analytics' },
+  { href: '/alerts', label: 'Property Alerts' },
+  { href: '/transactions', label: 'Transactions' },
+  { href: '/cma', label: 'CMA Builder' },
+  { href: '/land', label: 'Land Development' },
+  { href: '/import', label: 'Data Import' },
+  { href: '/mortgage', label: 'Mortgage' },
+  { href: '/marketing', label: 'Marketing' },
+  { href: '/monitoring', label: 'GIS Monitor' },
+  { href: '/settings/branding', label: 'Branding' },
+];
 
 export default function RootLayout({
   children,
@@ -14,52 +28,42 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900">
+      <body className="bg-[var(--sf-bg,#f9fafb)] text-[var(--sf-fg,#111827)] antialiased">
         <div className="flex min-h-screen">
-          {/* Sidebar Navigation */}
-          <div className="w-64 bg-white border-r border-gray-200 p-6 hidden lg:flex flex-col">
+          {/* Sidebar */}
+          <aside className="w-64 bg-white border-r border-gray-200 p-6 hidden lg:flex flex-col sticky top-0 h-screen">
             <div className="mb-10">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-black rounded-2xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center shadow-sm">
                   <span className="text-white font-bold text-xl">S</span>
                 </div>
                 <div>
-                  <div className="font-semibold text-2xl tracking-tight">Summit Forge</div>
-                  <div className="text-[10px] text-gray-500 -mt-1">JEFFERSON COUNTY</div>
+                  <div className="font-semibold text-xl tracking-tight leading-none">Summit Forge</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5 tracking-wider">ARCHIBALD-BAGLEY</div>
                 </div>
               </div>
             </div>
 
-            <nav className="space-y-1 text-sm">
-              <Link href="/analytics" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                Analytics
-              </Link>
-              <Link href="/cma" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                CMA Builder
-              </Link>
-              <Link href="/land" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                Land Development
-              </Link>
-              <Link href="/import" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                Data Import
-              </Link>
-              <Link href="/mortgage" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                Mortgage Calculator
-              </Link>
-              <Link href="/alerts" className="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-gray-100 font-medium text-gray-700">
-                Property Alerts
-              </Link>
+            <nav className="space-y-0.5 text-sm flex-1 overflow-y-auto">
+              {nav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-2xl hover:bg-gray-100 font-medium text-gray-700 transition"
+                >
+                  {item.label}
+                </Link>
+              ))}
             </nav>
 
-            <div className="mt-auto pt-8 border-t text-xs text-gray-400">
-              v0.2 • July 2026
+            <div className="pt-6 border-t text-xs text-gray-400">
+              <div>v0.3 • July 2026</div>
+              <div className="mt-1">Jefferson County, ID</div>
             </div>
-          </div>
+          </aside>
 
-          {/* Main Content */}
-          <div className="flex-1">
-            {children}
-          </div>
+          {/* Main */}
+          <main className="flex-1 min-w-0">{children}</main>
         </div>
       </body>
     </html>

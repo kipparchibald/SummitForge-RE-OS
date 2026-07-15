@@ -1,34 +1,43 @@
-# SummitForge + IdeaSpeak — Autonomous Build Status
+# SummitForge Status — July 15, 2026
 
-**Last updated:** July 13, 2026
+**Current score: ~6.2 / 10**
 
----
+## Just shipped (this commit)
 
-## 🟢 Working
+| Feature | Status |
+|---------|--------|
+| **Dashboard** (`/`) | Live matches feed + stats + quick actions |
+| **Recent Matches** | Wired into main dashboard |
+| **Transaction Coordinator** | Full UI at `/transactions` + Idaho forms generation |
+| **SMS** | Real Twilio integration (env-based) + simulation fallback |
+| **Supabase dual store** | `lib/alerts/supabase-store.ts` — localStorage first, Supabase when keys present |
+| **Schema** | Full multi-tenant schema (alerts, matches, listings, transactions, brokerages) |
+| **Branding** | CSS variables + layout using theme tokens, polished sidebar |
+| **Navigation** | Dashboard, Transactions, Marketing, GIS Monitor, Branding all linked |
 
-| Project | Score | Focus |
-|---------|-------|-------|
-| **IdeaSpeak** | 8.1 / 10 | Build → Live Preview in one app |
-| **SummitForge** | 4.8 / 10 | Alerts + Matching + multi-tenant foundation |
+## How to run
 
----
+```bash
+git pull origin main
+npm install
+npm run dev
+```
 
-## SummitForge Recent Progress
+Open http://localhost:3000 — you land on the new Command Center dashboard.
 
-- Comprehensive README
-- package.json expanded
-- Matching engine ↔ import pipeline
-- SMS-first notifications helpers
-- Alerts page with Recent Matches tab
-- Multi-tenant types
-- Branding theme tokens (this commit)
+## Next highest-value work
 
-## Next
+1. Wire Supabase client into the Alerts page UI (currently still localStorage primary)
+2. Real-time matching webhook / cron when new listings arrive
+3. Client portal + voice AI handoff
+4. Full multi-tenant auth (Supabase Auth + RLS)
+5. White-label onboarding flow
 
-- Wire live matches into UI
-- Branding CSS variables applied across layout
-- Analytics consistency pass
+## Architecture notes
 
----
+- SMS-first: phone is primary contact, email is progressive capture
+- Agent-first with brokerage oversight (types already support brokerageId)
+- Multi-tenant ready from day one (schema + types)
+- Navica CSV import remains the primary listing source
 
-*Pull often. Both repos stay current.*
+*Pull often. Keep building.*

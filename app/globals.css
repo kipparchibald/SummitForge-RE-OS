@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sf-primary: #000000;
+  --sf-secondary: #111111;
+  --sf-accent: #10b981;
+  --sf-bg: #f9fafb;
+  --sf-fg: #111827;
+  --sf-muted: #6b7280;
+  --sf-radius: 1rem;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Smooth focus rings */
+*:focus-visible {
+  outline: 2px solid var(--sf-accent);
+  outline-offset: 2px;
+}
+
+/* Card hover lift */
+.sf-card {
+  @apply bg-white border border-gray-200 rounded-3xl shadow-sm transition-shadow;
+}
+.sf-card:hover {
+  @apply shadow-md;
+}
