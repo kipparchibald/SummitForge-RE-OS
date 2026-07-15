@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getStoredAlerts, addMatches } from '@/lib/alerts/store';
+import Link from 'next/link';
+import { getAlerts, addMatches, addListings } from '@/lib/alerts/supabase-store';
+import type { Listing } from '@/types/alerts';
 
 export default function DataImport() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -21,8 +23,7 @@ export default function DataImport() {
       formData.append('file', file);
       formData.append('source', 'mls');
 
-      // Send current alerts so the server can run matching
-      const alerts = getStoredAlerts();
+      const alerts = await getAlerts('user_kipp');
       if (alerts.length > 0) {
         formData.append('alerts', JSON.stringify(alerts));
       }
@@ -38,9 +39,28 @@ export default function DataImport() {
         throw new Error(data.error || 'Import failed');
       }
 
-      // Store matches locally so the Alerts page can show them
+      // Persist matches + listing snapshots via dual store
       if (data.matches && data.matches.length > 0) {
-        addMatches(data.matches);
+        await addMatches(data.matches);
+      }
+
+      // Convert normalized listings for local cache (rematch / display)
+      if (data.listings && Array.isArray(data.listings)) {
+        const asListings: Listing[] = data.listings.map((n: any, idx: number) => ({
+          id: n.externalId || `imported_${Date.now()}_${idx}`,
+          mlsNumber: n.externalId || `imported_${idx}`,
+          address: n.address,
+          city: n.city || 'Unknown',
+          location: mapCity(n.city || n.address),
+          price: n.price,
+          acres: n.acres,
+          propertyType: mapType(n.propertyType),
+          isNewConstruction: n.isNewConstruction ?? false,
+          description: n.description,
+          url: n.url,
+          importedAt: new Date().toISOString(),
+        }));
+        await addListings(asListings);
       }
 
       setResult(data);
@@ -55,7 +75,8 @@ export default function DataImport() {
     <div className="p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-semibold mb-2">Data Import</h1>
       <p className="text-gray-600 mb-8">
-        Upload Navica MLS exports. New listings are automatically matched against your active Property Alerts.
+        Upload Navica MLS exports. New listings are automatically matched against your active Property
+        Alerts and stored for re-matching.
       </p>
 
       <div className="bg-white border border-gray-200 rounded-3xl p-8">
@@ -63,7 +84,7 @@ export default function DataImport() {
           <div className="text-5xl mb-4">📁</div>
           <h3 className="font-semibold mb-2">Upload Navica Export (CSV)</h3>
           <p className="text-sm text-gray-500 mb-6">
-            Supports your standard Jefferson County export format. Matching runs automatically.
+            Supports your Jefferson County export format. Matching runs automatically.
           </p>
 
           <label className="inline-block">
@@ -94,8 +115,10 @@ export default function DataImport() {
               {result.matches?.length > 0 && (
                 <>
                   {' '}
-                  Generated <strong>{result.matches.length}</strong> alert matches.
-                  Go to Property Alerts → Recent Matches to review them.
+                  Generated <strong>{result.matches.length}</strong> alert matches.{' '}
+                  <Link href="/alerts" className="underline font-medium">
+                    View Recent Matches →
+                  </Link>
                 </>
               )}
             </div>
@@ -103,10 +126,32 @@ export default function DataImport() {
         )}
 
         <div className="mt-6 text-xs text-gray-500">
-          Tip: Export from Navica with Sold + Active listings for best results. We automatically
-          deduplicate and run your active alerts against every new listing.
+          Tip: Export from Navica with Sold + Active listings for best results. We deduplicate and run
+          your active alerts against every new listing.
         </div>
       </div>
     </div>
   );
+}
+
+function mapCity(city: string): any {
+  const n = (city || '').toLowerCase();
+  if (n.includes('rigby')) return 'Rigby';
+  if (n.includes('ririe')) return 'Ririe';
+  if (n.includes('roberts')) return 'Roberts';
+  if (n.includes('hamer')) return 'Hamer';
+  if (n.includes('terreton') || n.includes('mud lake')) return 'Terreton';
+  if (n.includes('idaho falls')) return 'Idaho Falls Area';
+  return 'Other';
+}
+
+function mapType(type: string): any {
+  const t = (type || '').toLowerCase();
+  if (t.includes('single')) return 'Single Family';
+  if (t.includes('new') || t.includes('construction')) return 'New Construction';
+  if (t.includes('land') || t.includes('vacant')) return 'Land';
+  if (t.includes('farm') || t.includes('ranch')) return 'Farm/Ranch';
+  if (t.includes('multi')) return 'Multi-Family';
+  if (t.includes('commercial')) return 'Commercial';
+  return 'Single Family';
 }

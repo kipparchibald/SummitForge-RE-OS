@@ -59,7 +59,6 @@ export async function importListings(
     .map(row => normalizeRow(row, source))
     .filter(Boolean) as NormalizedListing[];
 
-  // Optional: run alert matching when alerts are provided
   let matches: any[] = [];
   let notifications: any[] = [];
 
@@ -75,11 +74,21 @@ export async function importListings(
       propertyType: mapPropertyType(n.propertyType),
       isNewConstruction: n.isNewConstruction ?? false,
       description: n.description,
+      url: n.url,
       importedAt: new Date().toISOString(),
     }));
 
     for (const listing of alertListings) {
       const listingMatches = findMatchesForListing(listing, options.alerts);
+      // Prefer SMS channel on match when alert wants SMS
+      for (const m of listingMatches) {
+        const alert = options.alerts.find(a => a.id === m.alertId);
+        if (alert?.notifyBy.includes('sms')) {
+          m.notificationMethod = 'sms';
+        } else if (alert?.notifyBy.includes('in-app')) {
+          m.notificationMethod = 'in-app';
+        }
+      }
       matches.push(...listingMatches);
     }
 
@@ -87,13 +96,18 @@ export async function importListings(
       notifications = await processMatchesForNotification(
         matches,
         options.alerts,
-        alertListings
+        alertListings,
+        {
+          sendSms: true,
+          phoneLookup: (alert) => alert.phone,
+        }
       );
-      console.log(`[Import] Generated ${matches.length} matches and ${notifications.length} notification payloads`);
+      console.log(
+        `[Import] Generated ${matches.length} matches and ${notifications.length} notification payloads`
+      );
     }
   }
 
-  // Trigger land projections for land listings
   const landListings = normalized.filter(
     l =>
       l.propertyType.toLowerCase().includes('land') ||
@@ -120,10 +134,16 @@ function parseCSVText(csvText: string): any[] {
 
 function normalizeRow(row: any, source: string): NormalizedListing | null {
   try {
-    const address = row.address || row['Street Address'] || row['Property Address'] || row.location || '';
-    const price = parseFloat(row.price || row['List Price'] || row['Asking Price'] || row.price || 0);
-    const acres = parseFloat(row.acres || row['Acres'] || row['Lot Size'] || row['Total Acres'] || 0);
-    const propertyType = row['Property Type'] || row.type || row['Home Type'] || 'Land';
+    const address =
+      row.address || row['Street Address'] || row['Property Address'] || row.location || '';
+    const price = parseFloat(
+      row.price || row['List Price'] || row['Asking Price'] || row.price || 0
+    );
+    const acres = parseFloat(
+      row.acres || row['Acres'] || row['Lot Size'] || row['Total Acres'] || 0
+    );
+    const propertyType =
+      row['Property Type'] || row.type || row['Home Type'] || 'Land';
     const description = row.description || row['Public Remarks'] || '';
     const city = row.city || row.City || row['City'] || '';
 
@@ -139,7 +159,9 @@ function normalizeRow(row: any, source: string): NormalizedListing | null {
       propertyType,
       description,
       url: row.url || row['Listing URL'] || row.link,
-      isNewConstruction: /new construction|new build|spec/i.test(propertyType + ' ' + description),
+      isNewConstruction: /new construction|new build|spec/i.test(
+        propertyType + ' ' + description
+      ),
       rawData: row,
     };
   } catch (e) {
@@ -172,5 +194,4 @@ function mapPropertyType(type: string): any {
 
 async function triggerRawLandProjection(listing: NormalizedListing) {
   console.log(`Triggering raw land projection for: ${listing.address}`);
-  // Integrate with lib/analysis or lib/development modules
 }

@@ -1,5 +1,6 @@
 // Summit Forge - Alert Matching Engine
-// Enhanced scoring with location hard-filter, price/acres, property type, new construction, and keywords
+// Location hard-filter + price/acres/type/new-construction/keywords scoring
+// Attaches listingSnapshot + alertName so UI works without joins
 
 import { Alert, Listing, AlertMatch } from '@/types/alerts';
 
@@ -25,7 +26,7 @@ export function calculateMatchScore(alert: Alert, listing: Listing): number {
       listing.price >= alert.minPrice * 0.9 &&
       listing.price <= alert.maxPrice * 1.1
     ) {
-      score += 15; // close enough
+      score += 15;
     }
   } else if (alert.minPrice !== undefined && listing.price >= alert.minPrice) {
     score += 20;
@@ -58,7 +59,7 @@ export function calculateMatchScore(alert: Alert, listing: Listing): number {
     if (listing.isNewConstruction) {
       score += 15;
     } else {
-      return 0; // hard fail
+      return 0;
     }
   } else if (listing.isNewConstruction) {
     score += 8;
@@ -74,8 +75,7 @@ export function calculateMatchScore(alert: Alert, listing: Listing): number {
     }
   }
 
-  const normalized = Math.min(100, Math.round((score / maxPossible) * 100));
-  return normalized;
+  return Math.min(100, Math.round((score / maxPossible) * 100));
 }
 
 export function findMatchesForListing(listing: Listing, alerts: Alert[]): AlertMatch[] {
@@ -94,6 +94,16 @@ export function findMatchesForListing(listing: Listing, alerts: Alert[]): AlertM
         matchScore: score,
         matchedAt: new Date().toISOString(),
         notified: false,
+        alertName: alert.name,
+        listingSnapshot: {
+          address: listing.address,
+          city: listing.city,
+          price: listing.price,
+          acres: listing.acres,
+          propertyType: listing.propertyType,
+          isNewConstruction: listing.isNewConstruction,
+          mlsNumber: listing.mlsNumber,
+        },
       });
     }
   }
@@ -105,8 +115,7 @@ export function findMatchesForAlerts(listings: Listing[], alerts: Alert[]): Aler
   const allMatches: AlertMatch[] = [];
 
   for (const listing of listings) {
-    const matches = findMatchesForListing(listing, alerts);
-    allMatches.push(...matches);
+    allMatches.push(...findMatchesForListing(listing, alerts));
   }
 
   return allMatches.sort((a, b) => b.matchScore - a.matchScore);

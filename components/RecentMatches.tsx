@@ -1,41 +1,40 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getStoredMatches } from '@/lib/alerts/store';
+import { getMatches, markMatchNotified } from '@/lib/alerts/supabase-store';
 import type { AlertMatch } from '@/types/alerts';
 
-interface DisplayMatch {
-  id: string;
-  alertName: string;
-  address: string;
-  price: number;
-  acres?: number;
-  score: number;
-  matchedAt: string;
-  channel: 'sms' | 'in-app' | 'email';
-}
-
 export default function RecentMatches({ limit = 10 }: { limit?: number }) {
-  const [matches, setMatches] = useState<DisplayMatch[]>([]);
+  const [matches, setMatches] = useState<AlertMatch[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // For now we only have match records. In a full system we would join with alerts + listings.
-    // We create a lightweight display version.
-    const raw: AlertMatch[] = getStoredMatches();
-
-    const display: DisplayMatch[] = raw.slice(0, limit).map(m => ({
-      id: m.id,
-      alertName: `Alert ${m.alertId.slice(-6)}`,
-      address: `Listing ${m.listingId}`,
-      price: 0,
-      score: m.matchScore,
-      matchedAt: m.matchedAt,
-      channel: m.notificationMethod || 'in-app',
-    }));
-
-    // If no real matches yet, show a helpful empty state (no more hard-coded mock data)
-    setMatches(display);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const raw = await getMatches(limit);
+      if (!cancelled) {
+        setMatches(raw);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [limit]);
+
+  const handleMarkRead = async (id: string) => {
+    await markMatchNotified(id);
+    setMatches(prev => prev.map(m => (m.id === id ? { ...m, notified: true } : m)));
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-10 text-gray-400 bg-white border border-gray-100 rounded-3xl">
+        Loading matches…
+      </div>
+    );
+  }
 
   if (matches.length === 0) {
     return (
@@ -43,7 +42,7 @@ export default function RecentMatches({ limit = 10 }: { limit?: number }) {
         <div className="text-3xl mb-2">🔔</div>
         <div className="font-medium">No matches yet</div>
         <div className="text-sm mt-1">
-          Import a Navica CSV or create more alerts. Matches will appear here automatically.
+          Import a Navica CSV or create alerts. Matches appear here automatically.
         </div>
       </div>
     );
@@ -51,36 +50,65 @@ export default function RecentMatches({ limit = 10 }: { limit?: number }) {
 
   return (
     <div className="space-y-3">
-      {matches.map(m => (
-        <div
-          key={m.id}
-          className="bg-white border border-gray-200 rounded-2xl p-4 flex justify-between items-center shadow-sm"
-        >
-          <div>
-            <div className="font-medium">{m.address}</div>
-            <div className="text-sm text-gray-500">
-              Matched to <span className="font-medium text-gray-700">{m.alertName}</span>
+      {matches.map(m => {
+        const snap = m.listingSnapshot;
+        const address = snap?.address || `Listing ${m.listingId}`;
+        const price = snap?.price;
+        const acres = snap?.acres;
+        const alertName = m.alertName || `Alert ${m.alertId.slice(-6)}`;
+        const channel = m.notificationMethod || 'in-app';
+
+        return (
+          <div
+            key={m.id}
+            className={`bg-white border rounded-2xl p-4 flex justify-between items-center shadow-sm ${
+              m.notified ? 'border-gray-200 opacity-80' : 'border-emerald-200 ring-1 ring-emerald-50'
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="font-medium text-gray-900 truncate">{address}</div>
+              <div className="text-sm text-gray-500 mt-0.5">
+                Matched to <span className="font-medium text-gray-700">{alertName}</span>
+                {price != null && price > 0 && (
+                  <span className="ml-2 text-gray-800">
+                    ${price.toLocaleString()}
+                    {acres != null ? ` · ${acres} ac` : ''}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                <span className="font-medium text-emerald-700">{m.matchScore}% match</span>
+                <span>·</span>
+                <span>{new Date(m.matchedAt).toLocaleString()}</span>
+                {snap?.isNewConstruction && (
+                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] uppercase">
+                    New Construction
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="text-xs text-gray-400 mt-1">
-              Score {m.score}% • {new Date(m.matchedAt).toLocaleString()}
+            <div className="flex items-center gap-2 shrink-0 ml-3">
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full uppercase tracking-wide ${
+                  channel === 'sms'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {channel}
+              </span>
+              {!m.notified && (
+                <button
+                  onClick={() => handleMarkRead(m.id)}
+                  className="text-sm px-3 py-1.5 border rounded-xl hover:bg-gray-50"
+                >
+                  Mark read
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full uppercase tracking-wide ${
-                m.channel === 'sms'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-blue-100 text-blue-700'
-              }`}
-            >
-              {m.channel}
-            </span>
-            <button className="text-sm px-3 py-1.5 border rounded-xl hover:bg-gray-50">
-              View
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

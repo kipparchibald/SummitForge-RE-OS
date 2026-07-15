@@ -1,5 +1,5 @@
-// Dual store: localStorage (always works) + Supabase (when configured)
-// This lets the app run offline / without Supabase keys, then seamlessly upgrade.
+// Dual store: localStorage (always) + Supabase (when configured)
+// Seamless offline → cloud upgrade path for multi-tenant later.
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Alert, AlertMatch, Listing } from '@/types/alerts';
@@ -9,6 +9,10 @@ import {
   addMatches as localAddMatches,
   getStoredAlerts as localGetAlerts,
   saveAlerts as localSaveAlerts,
+  deleteStoredAlert as localDeleteAlert,
+  getStoredListings as localGetListings,
+  addListings as localAddListings,
+  markMatchNotified as localMarkNotified,
 } from './store';
 
 let supabase: SupabaseClient | null = null;
@@ -24,6 +28,10 @@ function getSupabase(): SupabaseClient | null {
   return supabase;
 }
 
+export function isSupabaseConfigured(): boolean {
+  return !!getSupabase();
+}
+
 export async function getAlerts(userId?: string): Promise<Alert[]> {
   const sb = getSupabase();
   if (sb) {
@@ -31,8 +39,11 @@ export async function getAlerts(userId?: string): Promise<Alert[]> {
       let q = sb.from('alerts').select('*').order('created_at', { ascending: false });
       if (userId) q = q.eq('user_id', userId);
       const { data, error } = await q;
-      if (!error && data) {
-        return data.map(rowToAlert);
+      if (!error && data && data.length > 0) {
+        const alerts = data.map(rowToAlert);
+        // keep local in sync
+        localSaveAlerts(alerts);
+        return alerts;
       }
     } catch (e) {
       console.warn('[supabase-store] getAlerts failed, falling back to local', e);
@@ -42,7 +53,6 @@ export async function getAlerts(userId?: string): Promise<Alert[]> {
 }
 
 export async function saveAlert(alert: Alert): Promise<void> {
-  // Always write local
   const existing = localGetAlerts();
   const idx = existing.findIndex(a => a.id === alert.id);
   if (idx >= 0) existing[idx] = alert;
@@ -59,6 +69,18 @@ export async function saveAlert(alert: Alert): Promise<void> {
   }
 }
 
+export async function deleteAlert(id: string): Promise<void> {
+  localDeleteAlert(id);
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      await sb.from('alerts').delete().eq('id', id);
+    } catch (e) {
+      console.warn('[supabase-store] deleteAlert failed', e);
+    }
+  }
+}
+
 export async function getMatches(limit = 50): Promise<AlertMatch[]> {
   const sb = getSupabase();
   if (sb) {
@@ -68,7 +90,7 @@ export async function getMatches(limit = 50): Promise<AlertMatch[]> {
         .select('*')
         .order('matched_at', { ascending: false })
         .limit(limit);
-      if (!error && data) {
+      if (!error && data && data.length > 0) {
         return data.map(rowToMatch);
       }
     } catch (e) {
@@ -91,6 +113,27 @@ export async function addMatches(matches: AlertMatch[]): Promise<void> {
   }
 }
 
+export async function markMatchNotified(matchId: string): Promise<void> {
+  localMarkNotified(matchId);
+  const sb = getSupabase();
+  if (sb) {
+    try {
+      await sb.from('alert_matches').update({ notified: true }).eq('id', matchId);
+    } catch (e) {
+      console.warn('[supabase-store] markMatchNotified failed', e);
+    }
+  }
+}
+
+export async function getListings(): Promise<Listing[]> {
+  return localGetListings();
+}
+
+export async function addListings(listings: Listing[]): Promise<void> {
+  localAddListings(listings);
+  // Future: upsert into listings table when Supabase ready
+}
+
 // Helpers
 function rowToAlert(row: any): Alert {
   return {
@@ -108,6 +151,8 @@ function rowToAlert(row: any): Alert {
     keywords: row.keywords || [],
     notifyBy: row.notify_by || ['sms'],
     frequency: row.frequency || 'instant',
+    phone: row.phone,
+    email: row.email,
     active: row.active ?? true,
     createdAt: row.created_at,
     lastMatchedAt: row.last_matched_at,
@@ -130,6 +175,8 @@ function alertToRow(a: Alert) {
     keywords: a.keywords,
     notify_by: a.notifyBy,
     frequency: a.frequency,
+    phone: a.phone,
+    email: a.email,
     active: a.active,
     created_at: a.createdAt,
     last_matched_at: a.lastMatchedAt,
@@ -145,6 +192,8 @@ function rowToMatch(row: any): AlertMatch {
     matchedAt: row.matched_at,
     notified: row.notified || false,
     notificationMethod: row.notification_method,
+    alertName: row.alert_name,
+    listingSnapshot: row.listing_snapshot || undefined,
   };
 }
 
@@ -157,5 +206,7 @@ function matchToRow(m: AlertMatch) {
     matched_at: m.matchedAt,
     notified: m.notified,
     notification_method: m.notificationMethod,
+    alert_name: m.alertName,
+    listing_snapshot: m.listingSnapshot,
   };
 }

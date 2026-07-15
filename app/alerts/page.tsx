@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Location, PropertyType } from '@/types/alerts';
-import { getStoredAlerts, saveAlerts, getStoredMatches } from '@/lib/alerts/store';
+import {
+  getAlerts,
+  saveAlert,
+  deleteAlert,
+  getMatches,
+  isSupabaseConfigured,
+} from '@/lib/alerts/supabase-store';
 import RecentMatches from '@/components/RecentMatches';
 
 const LOCATIONS: Location[] = ['Rigby', 'Ririe', 'Roberts', 'Hamer', 'Terreton', 'Idaho Falls Area'];
@@ -14,6 +20,9 @@ export default function PropertyAlerts() {
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
   const [activeTab, setActiveTab] = useState<'alerts' | 'matches'>('alerts');
   const [matchCount, setMatchCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [supabaseOn, setSupabaseOn] = useState(false);
+  const [rematching, setRematching] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -24,15 +33,14 @@ export default function PropertyAlerts() {
     propertyTypes: [] as PropertyType[],
     newConstructionOnly: false,
     notifyBy: ['sms', 'in-app'] as ('sms' | 'in-app' | 'email')[],
+    phone: '',
   });
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = getStoredAlerts();
-    if (stored.length > 0) {
-      setAlerts(stored);
-    } else {
-      // Seed one useful default for Archibald-Bagley
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setSupabaseOn(isSupabaseConfigured());
+    let list = await getAlerts('user_kipp');
+    if (list.length === 0) {
       const seed: Alert = {
         id: 'alert_rigby_nc',
         userId: 'user_kipp',
@@ -46,21 +54,22 @@ export default function PropertyAlerts() {
         newConstructionOnly: true,
         notifyBy: ['sms', 'in-app'],
         frequency: 'instant',
+        phone: '',
         active: true,
         createdAt: new Date().toISOString(),
       };
-      setAlerts([seed]);
-      saveAlerts([seed]);
+      await saveAlert(seed);
+      list = [seed];
     }
-    setMatchCount(getStoredMatches().length);
+    setAlerts(list);
+    const matches = await getMatches(100);
+    setMatchCount(matches.length);
+    setLoading(false);
   }, []);
 
-  // Persist whenever alerts change
   useEffect(() => {
-    if (alerts.length > 0) {
-      saveAlerts(alerts);
-    }
-  }, [alerts]);
+    refresh();
+  }, [refresh]);
 
   const resetForm = () => {
     setFormData({
@@ -72,12 +81,13 @@ export default function PropertyAlerts() {
       propertyTypes: [],
       newConstructionOnly: false,
       notifyBy: ['sms', 'in-app'],
+      phone: '',
     });
     setEditingAlert(null);
     setShowForm(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newAlert: Alert = {
@@ -93,23 +103,21 @@ export default function PropertyAlerts() {
       newConstructionOnly: formData.newConstructionOnly,
       notifyBy: formData.notifyBy,
       frequency: 'instant',
+      phone: formData.phone || undefined,
       active: true,
       createdAt: editingAlert ? editingAlert.createdAt : new Date().toISOString(),
     };
 
-    if (editingAlert) {
-      setAlerts(prev => prev.map(a => (a.id === editingAlert.id ? newAlert : a)));
-    } else {
-      setAlerts(prev => [...prev, newAlert]);
-    }
-
+    await saveAlert(newAlert);
+    await refresh();
     resetForm();
   };
 
-  const toggleAlert = (id: string) => {
-    setAlerts(prev =>
-      prev.map(alert => (alert.id === id ? { ...alert, active: !alert.active } : alert))
-    );
+  const toggleAlert = async (id: string) => {
+    const alert = alerts.find(a => a.id === id);
+    if (!alert) return;
+    await saveAlert({ ...alert, active: !alert.active });
+    await refresh();
   };
 
   const editAlert = (alert: Alert) => {
@@ -123,36 +131,78 @@ export default function PropertyAlerts() {
       propertyTypes: alert.propertyTypes,
       newConstructionOnly: alert.newConstructionOnly,
       notifyBy: alert.notifyBy,
+      phone: alert.phone || '',
     });
     setShowForm(true);
   };
 
-  const deleteAlert = (id: string) => {
-    if (confirm('Delete this alert?')) {
-      setAlerts(prev => prev.filter(a => a.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this alert?')) return;
+    await deleteAlert(id);
+    await refresh();
+  };
+
+  const handleRematch = async () => {
+    setRematching(true);
+    try {
+      const res = await fetch('/api/alerts/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alerts }),
+      });
+      const data = await res.json();
+      if (data.matches?.length) {
+        // Client also stores (API may run server-side without localStorage)
+        const { addMatches } = await import('@/lib/alerts/supabase-store');
+        await addMatches(data.matches);
+      }
+      await refresh();
+      setActiveTab('matches');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRematching(false);
     }
   };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="flex justify-between items-end mb-6">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Property Alerts</h1>
-          <p className="text-gray-600 mt-1">AI matching + SMS-first notifications for new listings</p>
+          <p className="text-gray-600 mt-1">
+            AI matching + SMS-first notifications
+            {supabaseOn ? (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                Supabase connected
+              </span>
+            ) : (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                Local storage mode
+              </span>
+            )}
+          </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(!showForm);
-          }}
-          className="bg-black text-white px-6 py-2.5 rounded-2xl text-sm font-medium hover:bg-gray-900 transition"
-        >
-          {showForm ? 'Cancel' : '+ New Alert'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRematch}
+            disabled={rematching || alerts.length === 0}
+            className="border border-gray-300 text-gray-800 px-4 py-2.5 rounded-2xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            {rematching ? 'Re-matching…' : 'Re-run Matching'}
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(!showForm);
+            }}
+            className="bg-black text-white px-6 py-2.5 rounded-2xl text-sm font-medium hover:bg-gray-900 transition"
+          >
+            {showForm ? 'Cancel' : '+ New Alert'}
+          </button>
+        </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-8 bg-gray-100 p-1 rounded-2xl w-fit">
         <button
           onClick={() => setActiveTab('alerts')}
@@ -172,15 +222,14 @@ export default function PropertyAlerts() {
         </button>
       </div>
 
-      {/* AI Notice */}
       <div className="bg-blue-50 border border-blue-100 rounded-3xl p-5 mb-8 text-sm">
-        <div className="font-medium text-blue-900 mb-1">🤖 AI-Powered Matching Active</div>
+        <div className="font-medium text-blue-900 mb-1">AI-Powered Matching Active</div>
         <div className="text-blue-700">
-          When new listings are imported from Navica, Summit Forge automatically matches them against your active alerts and notifies you via SMS (preferred) or in-app. Matches appear instantly in the Recent Matches tab.
+          New Navica imports are scored against your active alerts. SMS is preferred when a phone is
+          set on the alert. Matches show address, price, and score instantly.
         </div>
       </div>
 
-      {/* Create/Edit Form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-3xl p-8 mb-8 shadow-sm">
           <h3 className="font-semibold text-xl mb-6">
@@ -193,7 +242,7 @@ export default function PropertyAlerts() {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Rigby New Construction Under $550k"
                 className="w-full border border-gray-300 rounded-2xl px-4 py-3"
                 required
@@ -231,7 +280,7 @@ export default function PropertyAlerts() {
                 <input
                   type="number"
                   value={formData.minPrice}
-                  onChange={(e) => setFormData({ ...formData, minPrice: Number(e.target.value) })}
+                  onChange={e => setFormData({ ...formData, minPrice: Number(e.target.value) })}
                   className="w-full border border-gray-300 rounded-2xl px-4 py-3"
                 />
               </div>
@@ -240,7 +289,7 @@ export default function PropertyAlerts() {
                 <input
                   type="number"
                   value={formData.maxPrice}
-                  onChange={(e) => setFormData({ ...formData, maxPrice: Number(e.target.value) })}
+                  onChange={e => setFormData({ ...formData, maxPrice: Number(e.target.value) })}
                   className="w-full border border-gray-300 rounded-2xl px-4 py-3"
                 />
               </div>
@@ -252,7 +301,7 @@ export default function PropertyAlerts() {
                 type="number"
                 step="0.1"
                 value={formData.minAcres}
-                onChange={(e) => setFormData({ ...formData, minAcres: Number(e.target.value) })}
+                onChange={e => setFormData({ ...formData, minAcres: Number(e.target.value) })}
                 className="w-full border border-gray-300 rounded-2xl px-4 py-3"
               />
             </div>
@@ -287,14 +336,30 @@ export default function PropertyAlerts() {
                 type="checkbox"
                 id="newConstruction"
                 checked={formData.newConstructionOnly}
-                onChange={(e) => setFormData({ ...formData, newConstructionOnly: e.target.checked })}
+                onChange={e => setFormData({ ...formData, newConstructionOnly: e.target.checked })}
                 className="w-4 h-4"
               />
-              <label htmlFor="newConstruction" className="text-sm">New Construction only</label>
+              <label htmlFor="newConstruction" className="text-sm">
+                New Construction only
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">SMS phone (preferred)</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+12085551234"
+                className="w-full border border-gray-300 rounded-2xl px-4 py-3"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                SMS-first: phone is primary. Email can be captured later for richer features.
+              </p>
             </div>
 
             <div className="pt-2">
-              <div className="text-xs text-gray-500 mb-2">Notification preference (SMS preferred)</div>
+              <div className="text-xs text-gray-500 mb-2">Notification channels</div>
               <div className="flex gap-2">
                 {(['sms', 'in-app', 'email'] as const).map(ch => (
                   <button
@@ -330,8 +395,11 @@ export default function PropertyAlerts() {
         </div>
       )}
 
-      {/* Alerts Tab */}
-      {activeTab === 'alerts' && (
+      {loading && (
+        <div className="text-center py-12 text-gray-400">Loading alerts…</div>
+      )}
+
+      {!loading && activeTab === 'alerts' && (
         <div className="space-y-4">
           {alerts.length === 0 && (
             <div className="text-center py-16 text-gray-500 bg-white border border-dashed border-gray-200 rounded-3xl">
@@ -352,10 +420,11 @@ export default function PropertyAlerts() {
                   {alert.locations.join(', ')} • {alert.minAcres}+ acres •{' '}
                   {alert.newConstructionOnly ? 'New Construction Only' : 'Any Type'}
                 </div>
-                <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                <div className="text-xs text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
                   <span>
                     ${alert.minPrice?.toLocaleString()} – ${alert.maxPrice?.toLocaleString()}
                   </span>
+                  {alert.phone && <span className="text-emerald-600">SMS: {alert.phone}</span>}
                   <span className="inline-flex gap-1">
                     {alert.notifyBy.map(ch => (
                       <span
@@ -396,7 +465,7 @@ export default function PropertyAlerts() {
                   Edit
                 </button>
                 <button
-                  onClick={() => deleteAlert(alert.id)}
+                  onClick={() => handleDelete(alert.id)}
                   className="text-sm text-red-500 px-3 hover:text-red-600"
                 >
                   Delete
@@ -407,13 +476,12 @@ export default function PropertyAlerts() {
         </div>
       )}
 
-      {/* Recent Matches Tab */}
-      {activeTab === 'matches' && (
+      {!loading && activeTab === 'matches' && (
         <div className="space-y-4">
           <div className="text-sm text-gray-500 mb-2">
-            Matches generated when new Navica data is imported. SMS is preferred when available.
+            Matches from Navica imports and re-runs. SMS preferred when phone is set.
           </div>
-          <RecentMatches limit={20} />
+          <RecentMatches limit={30} />
         </div>
       )}
     </div>

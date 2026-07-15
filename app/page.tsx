@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import RecentMatches from '@/components/RecentMatches';
-import { getStoredAlerts, getStoredMatches } from '@/lib/alerts/store';
+import { getAlerts, getMatches, isSupabaseConfigured } from '@/lib/alerts/supabase-store';
 import { applyBrandTokens, DEFAULT_BRAND } from '@/lib/theme/tokens';
 
 export default function DashboardPage() {
@@ -12,27 +12,34 @@ export default function DashboardPage() {
     totalMatches: 0,
     unreadMatches: 0,
   });
+  const [storeMode, setStoreMode] = useState<'local' | 'supabase'>('local');
 
   useEffect(() => {
-    // Apply branding tokens on load
     applyBrandTokens(DEFAULT_BRAND);
+    setStoreMode(isSupabaseConfigured() ? 'supabase' : 'local');
 
-    const alerts = getStoredAlerts();
-    const matches = getStoredMatches();
-    setStats({
-      activeAlerts: alerts.filter(a => a.active).length,
-      totalMatches: matches.length,
-      unreadMatches: matches.filter(m => !m.notified).length,
-    });
+    (async () => {
+      const alerts = await getAlerts('user_kipp');
+      const matches = await getMatches(100);
+      setStats({
+        activeAlerts: alerts.filter(a => a.active).length,
+        totalMatches: matches.length,
+        unreadMatches: matches.filter(m => !m.notified).length,
+      });
+    })();
   }, []);
 
   return (
     <div className="min-h-screen bg-[var(--sf-bg,#f9fafb)]">
-      {/* Top Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Command Center</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Archibald-Bagley • Jefferson County, ID</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Archibald-Bagley • Jefferson County, ID
+            <span className="ml-2 text-xs text-gray-400">
+              ({storeMode === 'supabase' ? 'Supabase' : 'Local'} store)
+            </span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
@@ -49,7 +56,6 @@ export default function DashboardPage() {
       </header>
 
       <div className="p-8 space-y-8">
-        {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <StatCard label="Active Alerts" value={stats.activeAlerts} href="/alerts" accent="emerald" />
           <StatCard label="Total Matches" value={stats.totalMatches} href="/alerts" accent="blue" />
@@ -57,9 +63,7 @@ export default function DashboardPage() {
           <StatCard label="Open Transactions" value={0} href="/transactions" accent="purple" />
         </div>
 
-        {/* Main Split */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Left 2/3 - Recent Matches */}
           <div className="xl:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Recent Matches</h2>
@@ -70,7 +74,6 @@ export default function DashboardPage() {
             <RecentMatches limit={8} />
           </div>
 
-          {/* Right 1/3 - Quick Actions + Activity */}
           <div className="space-y-6">
             <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
@@ -89,7 +92,10 @@ export default function DashboardPage() {
               <div className="space-y-3 text-sm">
                 <StatusRow label="Matching Engine" status="ready" />
                 <StatusRow label="SMS Notifications" status="ready" />
-                <StatusRow label="Supabase" status="optional" />
+                <StatusRow
+                  label="Supabase"
+                  status={storeMode === 'supabase' ? 'ready' : 'optional'}
+                />
                 <StatusRow label="Idaho Forms" status="ready" />
                 <StatusRow label="GIS Monitor" status="ready" />
               </div>
