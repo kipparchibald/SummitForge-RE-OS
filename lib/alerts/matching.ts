@@ -1,52 +1,81 @@
 // Summit Forge - Alert Matching Engine
-// Basic version - will be enhanced with AI scoring later
+// Enhanced scoring with location hard-filter, price/acres, property type, new construction, and keywords
 
 import { Alert, Listing, AlertMatch } from '@/types/alerts';
 
 export function calculateMatchScore(alert: Alert, listing: Listing): number {
+  // Hard location filter
+  if (!alert.locations.includes(listing.location)) {
+    return 0;
+  }
+
   let score = 0;
-  let factors = 0;
+  let maxPossible = 0;
 
-  // Location match (very important)
-  if (alert.locations.includes(listing.location)) {
-    score += 30;
-  } else {
-    return 0; // Hard fail if location doesn't match
+  // Location base (already filtered)
+  score += 25;
+  maxPossible += 25;
+
+  // Price range (30 points)
+  maxPossible += 30;
+  if (alert.minPrice !== undefined && alert.maxPrice !== undefined) {
+    if (listing.price >= alert.minPrice && listing.price <= alert.maxPrice) {
+      score += 30;
+    } else if (
+      listing.price >= alert.minPrice * 0.9 &&
+      listing.price <= alert.maxPrice * 1.1
+    ) {
+      score += 15; // close enough
+    }
+  } else if (alert.minPrice !== undefined && listing.price >= alert.minPrice) {
+    score += 20;
+  } else if (alert.maxPrice !== undefined && listing.price <= alert.maxPrice) {
+    score += 20;
   }
-  factors++;
 
-  // Price range
-  if (alert.minPrice && listing.price >= alert.minPrice) score += 15;
-  if (alert.maxPrice && listing.price <= alert.maxPrice) score += 15;
-  factors += 2;
+  // Acres (15 points)
+  maxPossible += 15;
+  if (listing.acres !== undefined) {
+    if (alert.minAcres !== undefined && listing.acres >= alert.minAcres) {
+      score += 10;
+    }
+    if (alert.maxAcres !== undefined && listing.acres <= alert.maxAcres) {
+      score += 5;
+    } else if (alert.minAcres === undefined) {
+      score += 5;
+    }
+  }
 
-  // Acres
-  if (alert.minAcres && listing.acres && listing.acres >= alert.minAcres) score += 10;
-  if (alert.maxAcres && listing.acres && listing.acres <= alert.maxAcres) score += 5;
-  factors += 2;
-
-  // Property Type
+  // Property Type (20 points)
+  maxPossible += 20;
   if (alert.propertyTypes.includes(listing.propertyType)) {
-    score += 15;
+    score += 20;
   }
-  factors++;
 
-  // New Construction preference
+  // New Construction (hard or soft)
+  maxPossible += 15;
   if (alert.newConstructionOnly) {
     if (listing.isNewConstruction) {
-      score += 25;
+      score += 15;
     } else {
-      return 0; // Hard fail
+      return 0; // hard fail
     }
-  } else {
-    if (listing.isNewConstruction) score += 5; // Slight bonus
+  } else if (listing.isNewConstruction) {
+    score += 8;
   }
-  factors++;
 
-  // Normalize score to 0-100
-  const normalizedScore = Math.min(100, Math.round((score / (factors * 15)) * 100));
-  
-  return normalizedScore;
+  // Keywords (10 points)
+  maxPossible += 10;
+  if (alert.keywords && alert.keywords.length > 0 && listing.description) {
+    const desc = listing.description.toLowerCase();
+    const hits = alert.keywords.filter(k => desc.includes(k.toLowerCase())).length;
+    if (hits > 0) {
+      score += Math.min(10, hits * 4);
+    }
+  }
+
+  const normalized = Math.min(100, Math.round((score / maxPossible) * 100));
+  return normalized;
 }
 
 export function findMatchesForListing(listing: Listing, alerts: Alert[]): AlertMatch[] {
@@ -56,10 +85,10 @@ export function findMatchesForListing(listing: Listing, alerts: Alert[]): AlertM
     if (!alert.active) continue;
 
     const score = calculateMatchScore(alert, listing);
-    
-    if (score >= 60) { // Only consider strong matches
+
+    if (score >= 55) {
       matches.push({
-        id: `match_${Date.now()}_${alert.id}`,
+        id: `match_${Date.now()}_${alert.id}_${listing.id}`,
         alertId: alert.id,
         listingId: listing.id,
         matchScore: score,

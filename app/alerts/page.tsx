@@ -1,58 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, Location, PropertyType } from '@/types/alerts';
+import { getStoredAlerts, saveAlerts, getStoredMatches } from '@/lib/alerts/store';
+import RecentMatches from '@/components/RecentMatches';
 
 const LOCATIONS: Location[] = ['Rigby', 'Ririe', 'Roberts', 'Hamer', 'Terreton', 'Idaho Falls Area'];
 const PROPERTY_TYPES: PropertyType[] = ['Single Family', 'New Construction', 'Land', 'Farm/Ranch'];
 
-// Mock recent matches for demo (will be replaced by real import + matching pipeline)
-const MOCK_MATCHES = [
-  {
-    id: 'm1',
-    alertName: 'Rigby New Construction',
-    address: '412 N 3900 E, Rigby',
-    price: 489000,
-    acres: 0.62,
-    score: 92,
-    matchedAt: '2026-07-12T14:22:00Z',
-    channel: 'sms' as const,
-  },
-  {
-    id: 'm2',
-    alertName: 'Rigby New Construction',
-    address: '187 W 4000 N, Rigby',
-    price: 524500,
-    acres: 0.75,
-    score: 87,
-    matchedAt: '2026-07-11T09:15:00Z',
-    channel: 'in-app' as const,
-  },
-];
-
 export default function PropertyAlerts() {
-  const [alerts, setAlerts] = useState<Alert[]>([
-    {
-      id: 'alert_1',
-      userId: 'user_kipp',
-      brokerageId: 'archibald_bagley',
-      name: 'Rigby New Construction',
-      locations: ['Rigby'],
-      minPrice: 350000,
-      maxPrice: 650000,
-      minAcres: 0.3,
-      propertyTypes: ['Single Family', 'New Construction'],
-      newConstructionOnly: true,
-      notifyBy: ['sms', 'in-app'],
-      frequency: 'instant',
-      active: true,
-      createdAt: '2026-06-20T10:00:00Z',
-    },
-  ]);
-
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
   const [activeTab, setActiveTab] = useState<'alerts' | 'matches'>('alerts');
+  const [matchCount, setMatchCount] = useState(0);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -64,6 +25,42 @@ export default function PropertyAlerts() {
     newConstructionOnly: false,
     notifyBy: ['sms', 'in-app'] as ('sms' | 'in-app' | 'email')[],
   });
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const stored = getStoredAlerts();
+    if (stored.length > 0) {
+      setAlerts(stored);
+    } else {
+      // Seed one useful default for Archibald-Bagley
+      const seed: Alert = {
+        id: 'alert_rigby_nc',
+        userId: 'user_kipp',
+        brokerageId: 'archibald_bagley',
+        name: 'Rigby New Construction',
+        locations: ['Rigby'],
+        minPrice: 350000,
+        maxPrice: 650000,
+        minAcres: 0.3,
+        propertyTypes: ['Single Family', 'New Construction'],
+        newConstructionOnly: true,
+        notifyBy: ['sms', 'in-app'],
+        frequency: 'instant',
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
+      setAlerts([seed]);
+      saveAlerts([seed]);
+    }
+    setMatchCount(getStoredMatches().length);
+  }, []);
+
+  // Persist whenever alerts change
+  useEffect(() => {
+    if (alerts.length > 0) {
+      saveAlerts(alerts);
+    }
+  }, [alerts]);
 
   const resetForm = () => {
     setFormData({
@@ -171,7 +168,7 @@ export default function PropertyAlerts() {
             activeTab === 'matches' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
           }`}
         >
-          Recent Matches
+          Recent Matches ({matchCount})
         </button>
       </div>
 
@@ -179,7 +176,7 @@ export default function PropertyAlerts() {
       <div className="bg-blue-50 border border-blue-100 rounded-3xl p-5 mb-8 text-sm">
         <div className="font-medium text-blue-900 mb-1">🤖 AI-Powered Matching Active</div>
         <div className="text-blue-700">
-          When new listings are imported from Navica, Summit Forge automatically matches them against your active alerts and notifies you via SMS (preferred) or in-app.
+          When new listings are imported from Navica, Summit Forge automatically matches them against your active alerts and notifies you via SMS (preferred) or in-app. Matches appear instantly in the Recent Matches tab.
         </div>
       </div>
 
@@ -416,44 +413,7 @@ export default function PropertyAlerts() {
           <div className="text-sm text-gray-500 mb-2">
             Matches generated when new Navica data is imported. SMS is preferred when available.
           </div>
-
-          {MOCK_MATCHES.map(m => (
-            <div
-              key={m.id}
-              className="bg-white border border-gray-200 rounded-3xl p-5 flex justify-between items-center shadow-sm"
-            >
-              <div>
-                <div className="font-medium">{m.address}</div>
-                <div className="text-sm text-gray-500 mt-0.5">
-                  Matched to <span className="font-medium text-gray-700">{m.alertName}</span>
-                </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  ${m.price.toLocaleString()} • {m.acres} ac • Score {m.score}% •{' '}
-                  {new Date(m.matchedAt).toLocaleDateString()}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full uppercase tracking-wide ${
-                    m.channel === 'sms'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-blue-100 text-blue-700'
-                  }`}
-                >
-                  {m.channel}
-                </span>
-                <button className="text-sm px-4 py-2 border rounded-2xl hover:bg-gray-50">
-                  View
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {MOCK_MATCHES.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              No matches yet. Import new listings to generate alerts.
-            </div>
-          )}
+          <RecentMatches limit={20} />
         </div>
       )}
     </div>

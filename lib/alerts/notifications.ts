@@ -8,18 +8,19 @@ export interface NotificationPayload {
   alert: Alert;
   listing: Listing;
   channel: 'sms' | 'in-app' | 'email';
+  message: string;
 }
 
 /**
  * Build a short SMS-friendly message for a matched listing.
  * Keep under ~160 characters when possible.
  */
-export function buildSmsMessage(payload: NotificationPayload): string {
-  const { alert, listing } = payload;
+export function buildSmsMessage(alert: Alert, listing: Listing): string {
   const price = listing.price ? `$${listing.price.toLocaleString()}` : 'Price TBD';
   const acres = listing.acres ? ` • ${listing.acres} ac` : '';
+  const address = listing.address || listing.city;
 
-  return `SummitForge Alert: ${alert.name}\n${listing.address || listing.city} • ${price}${acres}\nReply STOP to pause.`;
+  return `SummitForge: New match for "${alert.name}"\n${address} • ${price}${acres}\nScore ${Math.round((listing as any).score || 0)}%. Reply STOP to pause.`;
 }
 
 /**
@@ -40,7 +41,6 @@ export function buildInAppNotification(payload: NotificationPayload) {
 
 /**
  * Placeholder for future Twilio integration.
- * For now we log and return a simulated success.
  */
 export async function sendSmsNotification(
   toPhone: string,
@@ -48,8 +48,6 @@ export async function sendSmsNotification(
 ): Promise<{ success: boolean; sid?: string }> {
   console.log(`[SMS Placeholder] To: ${toPhone} | Message: ${message}`);
   // TODO: Integrate Twilio when credentials are available
-  // const client = twilio(accountSid, authToken);
-  // const result = await client.messages.create({ body: message, from: twilioNumber, to: toPhone });
   return { success: true, sid: `sim_${Date.now()}` };
 }
 
@@ -68,18 +66,23 @@ export async function processMatchesForNotification(
     const listing = listings.find(l => l.id === match.listingId);
     if (!alert || !listing) continue;
 
-    // Prefer SMS if the alert allows it (SMS-first strategy)
     const preferred = alert.notifyBy.includes('sms')
       ? 'sms'
       : alert.notifyBy.includes('in-app')
       ? 'in-app'
       : 'email';
 
+    const message =
+      preferred === 'sms'
+        ? buildSmsMessage(alert, listing)
+        : `New match for ${alert.name}: ${listing.address} - $${listing.price?.toLocaleString()}`;
+
     payloads.push({
       match,
       alert,
       listing,
       channel: preferred,
+      message,
     });
   }
 
