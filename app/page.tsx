@@ -13,6 +13,7 @@ export default function DashboardPage() {
     unreadMatches: 0,
   });
   const [storeMode, setStoreMode] = useState<'local' | 'supabase'>('local');
+  const [autoImportEnabled, setAutoImportEnabled] = useState(false);
 
   useEffect(() => {
     applyBrandTokens(DEFAULT_BRAND);
@@ -29,6 +30,12 @@ export default function DashboardPage() {
     })();
   }, []);
 
+  const toggleAutoImport = () => {
+    setAutoImportEnabled(!autoImportEnabled);
+    // In real app this would start/stop the polling job
+    console.log(autoImportEnabled ? 'Auto-import stopped' : 'Auto-import started');
+  };
+
   return (
     <div className="min-h-screen bg-[var(--sf-bg,#f9fafb)]">
       <header className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
@@ -41,7 +48,26 @@ export default function DashboardPage() {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Prominent Auto-Import Toggle - now in header for maximum visibility */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-2 shadow-sm">
+            <span className="text-sm font-medium text-gray-700 mr-3">Auto-Import</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoImportEnabled}
+                onChange={toggleAutoImport}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:bg-emerald-500 transition"></div>
+              <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-5"></div>
+            </label>
+            <span className={`ml-3 text-xs font-medium ${autoImportEnabled ? 'text-emerald-600' : 'text-gray-400'}`}>
+              {autoImportEnabled ? 'ON' : 'OFF'}
+            </span>
+          </div>
+
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Agent Online
