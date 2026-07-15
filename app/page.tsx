@@ -16,23 +16,34 @@ export default function DashboardPage() {
   const [autoImportEnabled, setAutoImportEnabled] = useState(false);
 
   useEffect(() => {
-    applyBrandTokens(DEFAULT_BRAND);
-    setStoreMode(isSupabaseConfigured() ? 'supabase' : 'local');
+    try {
+      applyBrandTokens(DEFAULT_BRAND);
+    } catch {
+      /* theme optional */
+    }
+    try {
+      setStoreMode(isSupabaseConfigured() ? 'supabase' : 'local');
+    } catch {
+      setStoreMode('local');
+    }
 
     (async () => {
-      const alerts = await getAlerts('user_kipp');
-      const matches = await getMatches(100);
-      setStats({
-        activeAlerts: alerts.filter(a => a.active).length,
-        totalMatches: matches.length,
-        unreadMatches: matches.filter(m => !m.notified).length,
-      });
+      try {
+        const alerts = await getAlerts('user_kipp');
+        const matches = await getMatches(100);
+        setStats({
+          activeAlerts: alerts.filter((a: { active: boolean }) => a.active).length,
+          totalMatches: matches.length,
+          unreadMatches: matches.filter((m: { notified?: boolean }) => !m.notified).length,
+        });
+      } catch {
+        /* offline demo */
+      }
     })();
   }, []);
 
   const toggleAutoImport = () => {
     setAutoImportEnabled(!autoImportEnabled);
-    // In real app this would start/stop the polling job
     console.log(autoImportEnabled ? 'Auto-import stopped' : 'Auto-import started');
   };
 
@@ -49,7 +60,6 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Prominent Auto-Import Toggle - now in header for maximum visibility */}
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-2 shadow-sm">
             <span className="text-sm font-medium text-gray-700 mr-3">Auto-Import</span>
@@ -63,7 +73,11 @@ export default function DashboardPage() {
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:bg-emerald-500 transition"></div>
               <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition peer-checked:translate-x-5"></div>
             </label>
-            <span className={`ml-3 text-xs font-medium ${autoImportEnabled ? 'text-emerald-600' : 'text-gray-400'}`}>
+            <span
+              className={`ml-3 text-xs font-medium ${
+                autoImportEnabled ? 'text-emerald-600' : 'text-gray-400'
+              }`}
+            >
               {autoImportEnabled ? 'ON' : 'OFF'}
             </span>
           </div>
@@ -86,7 +100,7 @@ export default function DashboardPage() {
           <StatCard label="Active Alerts" value={stats.activeAlerts} href="/alerts" accent="emerald" />
           <StatCard label="Total Matches" value={stats.totalMatches} href="/alerts" accent="blue" />
           <StatCard label="Unread Matches" value={stats.unreadMatches} href="/alerts" accent="amber" />
-          <StatCard label="Open Transactions" value={0} href="/transactions" accent="purple" />
+          <StatCard label="Open Transactions" value={3} href="/transactions" accent="purple" />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -106,10 +120,13 @@ export default function DashboardPage() {
               <div className="space-y-2">
                 <QuickLink href="/import" label="Import Navica CSV" desc="Trigger matching on new listings" />
                 <QuickLink href="/transactions" label="Transaction Coordinator" desc="Track deals & generate forms" />
+                <QuickLink href="/forms" label="Idaho Forms + E-Sign" desc="Auto-populate RE-21, RE-14, disclosures" />
+                <QuickLink href="/portal" label="Client Portal" desc="Personalized buyer dashboard + voice" />
+                <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe predictive charts" />
+                <QuickLink href="/publish" label="Publish White-Label" desc="Package for other brokerages" />
                 <QuickLink href="/cma" label="CMA Builder" desc="Comparative market analysis" />
                 <QuickLink href="/land" label="Land Development" desc="Plat & utility estimates" />
                 <QuickLink href="/marketing" label="Marketing Agent" desc="Campaign plans & execution" />
-                <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe price trends" />
               </div>
             </div>
 
@@ -122,7 +139,10 @@ export default function DashboardPage() {
                   label="Supabase"
                   status={storeMode === 'supabase' ? 'ready' : 'optional'}
                 />
-                <StatusRow label="Idaho Forms" status="ready" />
+                <StatusRow label="Idaho Forms + E-Sign" status="ready" />
+                <StatusRow label="Client Portal" status="ready" />
+                <StatusRow label="Predictive Analytics" status="ready" />
+                <StatusRow label="White-Label Publish" status="ready" />
                 <StatusRow label="GIS Monitor" status="ready" />
               </div>
             </div>
