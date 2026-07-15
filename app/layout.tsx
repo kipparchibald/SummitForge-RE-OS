@@ -12,12 +12,15 @@ const nav = [
   { href: '/analytics', label: 'Analytics' },
   { href: '/alerts', label: 'Property Alerts' },
   { href: '/transactions', label: 'Transactions' },
+  { href: '/forms', label: 'Idaho Forms' },
+  { href: '/portal', label: 'Client Portal' },
   { href: '/cma', label: 'CMA Builder' },
   { href: '/land', label: 'Land Development' },
   { href: '/import', label: 'Data Import' },
   { href: '/mortgage', label: 'Mortgage' },
   { href: '/marketing', label: 'Marketing' },
   { href: '/monitoring', label: 'GIS Monitor' },
+  { href: '/publish', label: 'Publish / White-Label' },
   { href: '/settings/branding', label: 'Branding' },
 ];
 
@@ -30,7 +33,6 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-[var(--sf-bg,#f9fafb)] text-[var(--sf-fg,#111827)] antialiased">
         <div className="flex min-h-screen">
-          {/* Sidebar */}
           <aside className="w-64 bg-white border-r border-gray-200 p-6 hidden lg:flex flex-col sticky top-0 h-screen">
             <div className="mb-10">
               <div className="flex items-center gap-3">
@@ -57,12 +59,11 @@ export default function RootLayout({
             </nav>
 
             <div className="pt-6 border-t text-xs text-gray-400">
-              <div>v0.3 • July 2026</div>
+              <div>v0.4 • July 2026</div>
               <div className="mt-1">Jefferson County, ID</div>
             </div>
           </aside>
 
-          {/* Main */}
           <main className="flex-1 min-w-0">{children}</main>
         </div>
       </body>
