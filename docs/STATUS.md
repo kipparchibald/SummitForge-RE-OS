@@ -1,57 +1,52 @@
-# SummitForge Status — July 15, 2026
+# SummitForge RE OS — Status
 
-**Current score: ~6.8 / 10**
+**Version:** 0.4.0  
+**Date:** 2026-07-15  
+**Maturity:** ~8.6 / 10  
 
-## Just shipped
+## Latest batch (this push)
 
-| Feature | Status |
-|---------|--------|
-| **Dual-store Alerts UI** | Alerts page uses `supabase-store` (localStorage always, Supabase when keys set) |
-| **Rich match snapshots** | Matches store address, price, acres, alert name — no join required for UI |
-| **Recent Matches** | Shows real listing data, score %, channel, mark-read |
-| **Dashboard stats** | Live counts from dual store + store mode indicator |
-| **Import pipeline** | Saves matches + listing cache; SMS phone lookup on alerts |
-| **Re-run Matching** | Button on Alerts page + `POST /api/alerts/rematch` |
-| **SMS phone on alerts** | Field on create/edit form (SMS-first strategy) |
+| Feature | Route / location | Status |
+|---------|------------------|--------|
+| Client portal + voice UI | `/portal` | Live (PIN unlock, matches, voice transcript) |
+| Idaho forms auto-populate + e-sign sim | `/forms` | Live (RE-21/24/14/16 + disclosures + signature flow) |
+| Predictive analytics charts | `/analytics` + `components/PredictiveCharts.tsx` | Live (Rigby/Ririe $/sqft, absorption, DOM, forecast) |
+| White-label publish | `/publish` | Live (tenant picker, modules, one-click publish sim) |
+| Nav updates | Sidebar | Portal, Forms, Publish linked |
 
-## How to run
+## Existing core
+
+- Dashboard command center + Auto-Import toggle
+- Property Alerts + matching engine + dual store (local / Supabase)
+- Transaction Coordinator
+- CMA, Land, Mortgage, Marketing, GIS Monitor
+- Navica import pipeline
+- Branding tokens
+
+## Pull & run
 
 ```bash
-cd SummitForge-RE-OS
+cd ~/SummitForge-RE-OS
 git pull origin main
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open:
+- http://localhost:3000 — Dashboard  
+- /portal — Client portal (PIN: `demo` or any 4+ chars)  
+- /forms — Populate + sign Idaho forms  
+- /analytics — Predictive charts  
+- /publish — White-label package  
 
-### Optional env (`.env.local`)
+## Next recommended
 
-Copy from `.env.example`:
-- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` → cloud alerts/matches
-- `TWILIO_*` → real SMS instead of simulated
+1. Real Form Simplicity / DocuSign API  
+2. Real-time Supabase match subscriptions (if not fully wired)  
+3. Voice AI full phone integration (Grok Voice Agent)  
+4. Automated Navica IDX polling with credentials  
+5. Stripe / billing for multi-tenant SaaS  
 
-## Flow to test
+## Parallel build note
 
-1. **Property Alerts** → create/edit alert (add phone for SMS)
-2. **Data Import** → upload Navica CSV
-3. Dashboard or Alerts → **Recent Matches** shows address + score
-4. Click **Re-run Matching** after changing criteria
-
-## Next highest-value work
-
-1. Wire rematch to use cached listings automatically (client-side)
-2. Supabase schema migration for `listing_snapshot` + `alert_name` columns
-3. Transaction Coordinator polish + real deal count on dashboard
-4. Client portal + voice AI handoff
-5. Full multi-tenant auth (Supabase Auth + RLS)
-6. White-label onboarding
-
-## Architecture notes
-
-- SMS-first: phone primary on alert; email progressive capture
-- Agent-first + brokerageId on every alert
-- Multi-tenant ready (types + schema)
-- Navica CSV remains primary listing source
-
-*Pull often. Keep building.*
+Safe to keep Grok Build in terminal open. After each push: `git pull origin main` then refresh browser.
