@@ -5,6 +5,7 @@ import { queryListings } from '@/lib/supabase/client';
 import { fuzzyFilterListings, NormalizedListing } from '@/lib/import/listings';
 import { getRecentListings, searchRecentListingsFuzzy, syncRecentListingsFromSupabase, setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from '@/lib/import/recentListings';
 import { getAlerts } from '@/lib/alerts/supabase-store';
+import { COUNTIES } from '@/lib/geo/counties';
 
 interface ImportedListing {
   address: string;
@@ -53,10 +54,13 @@ const SearchFilters = ({
       className="border p-2 rounded"
     >
       <option value="">All locations</option>
-      <option value="rigby">Rigby</option>
-      <option value="blackfoot">Blackfoot</option>
-      <option value="shelley">Shelley</option>
-      <option value="terreton">Terreton / Jefferson</option>
+      {COUNTIES.map(({ county, locations }) => (
+        <optgroup key={county} label={`${county} County`}>
+          {locations.map(loc => (
+            <option key={loc} value={loc.toLowerCase()}>{loc}</option>
+          ))}
+        </optgroup>
+      ))}
     </select>
     <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="border p-2 rounded">
       <option value="acres-desc">Sort: Acres ↓</option>
@@ -332,7 +336,7 @@ export default function ImportPage() {
 
   // AI Semantic Search tie-in: calls /api/ai/council with search term for matching listings
   const handleSemanticSearchWithAI = async () => {
-    const term = searchTerm || 'land parcels in Jefferson County';
+    const term = searchTerm || 'land parcels in Eastern Idaho';
     setIsLoading(true);
     setAiSemanticResults(null);
     setStatus('Running Semantic Search with AI Council...');
@@ -373,7 +377,7 @@ export default function ImportPage() {
     <div className="p-8 max-w-4xl mx-auto">
       <div className="page-header">
         <h1>Import Listings</h1>
-        <p>Bring in opportunities from multiple sources. Connect live Navica IDX from Archibald-Bagley for real-time Jefferson County data.</p>
+        <p>Bring in opportunities from multiple sources. Connect live Navica IDX from Archibald-Bagley for real-time Eastern Idaho data.</p>
       </div>
 
       <div className="card p-8 mb-6">
@@ -507,7 +511,7 @@ export default function ImportPage() {
 
       <div className="mt-6 text-xs text-gray-500">
         Configure real <code>NAVICA_IDX_URL</code> + <code>NAVICA_API_KEY</code> in .env for live Snake River MLS data.
-        Demo data is realistic Jefferson County raw land.
+        Demo data is realistic Eastern Idaho raw land across all seven counties.
       </div>
     </div>
   );

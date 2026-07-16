@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * - If CRON_SECRET is not set (DEMO, local dev), the endpoint is open (calls still succeed with demo data).
  * - Vercel automatically injects the Bearer header when CRON_SECRET is configured for the project.
  *
- * Always works in DEMO mode (falls back to rich Jefferson County demo listings inside fetchArchibaldNavicaListings).
+ * Always works in DEMO mode (falls back to rich Eastern Idaho demo listings inside fetchArchibaldNavicaListings).
  */
 export async function GET(request: NextRequest) {
   // Fail-closed in production; open only in demo mode. See lib/auth/cron.ts.

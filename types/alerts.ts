@@ -1,13 +1,52 @@
 // Summit Forge - Property Alerts Types
 // Designed for multi-tenant + agent-first experience
 
+// Markets across the seven Eastern Idaho counties SummitForge covers.
+// Grouped by county in lib/geo/counties.ts — add new markets there, and add the
+// matching string here. 'Idaho Falls Area' is retained as a legacy value from
+// pre-expansion alerts; lib/geo/counties.ts normalizes it to 'Idaho Falls'.
 export type Location =
+  // Jefferson
   | 'Rigby'
   | 'Ririe'
   | 'Roberts'
+  | 'Menan'
+  | 'Lewisville'
   | 'Hamer'
   | 'Terreton'
-  | 'Idaho Falls Area'
+  // Madison
+  | 'Rexburg'
+  | 'Sugar City'
+  // Bonneville
+  | 'Idaho Falls'
+  | 'Ammon'
+  | 'Iona'
+  | 'Ucon'
+  | 'Swan Valley'
+  | 'Irwin'
+  // Bingham
+  | 'Blackfoot'
+  | 'Shelley'
+  | 'Firth'
+  | 'Basalt'
+  | 'Aberdeen'
+  // Bannock
+  | 'Pocatello'
+  | 'Chubbuck'
+  | 'Inkom'
+  | 'McCammon'
+  | 'Lava Hot Springs'
+  | 'Downey'
+  // Fremont
+  | 'St. Anthony'
+  | 'Ashton'
+  | 'Island Park'
+  | 'Parker'
+  // Teton
+  | 'Driggs'
+  | 'Victor'
+  | 'Tetonia'
+  | 'Idaho Falls Area' // legacy — normalized to 'Idaho Falls'
   | 'Other';
 
 export type PropertyType =

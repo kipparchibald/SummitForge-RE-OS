@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Location, PropertyType } from '@/types/alerts';
+import { COUNTIES } from '@/lib/geo/counties';
 import {
   getAlerts,
   saveAlert,
@@ -11,7 +12,6 @@ import {
 } from '@/lib/alerts/supabase-store';
 import RecentMatches from '@/components/RecentMatches';
 
-const LOCATIONS: Location[] = ['Rigby', 'Ririe', 'Roberts', 'Hamer', 'Terreton', 'Idaho Falls Area'];
 const PROPERTY_TYPES: PropertyType[] = ['Single Family', 'New Construction', 'Land', 'Farm/Ranch'];
 
 export default function PropertyAlerts() {
@@ -251,26 +251,58 @@ export default function PropertyAlerts() {
 
             <div>
               <label className="block text-sm font-medium mb-2">Locations</label>
-              <div className="flex flex-wrap gap-2">
-                {LOCATIONS.map(loc => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => {
-                      const newLocs = formData.locations.includes(loc)
-                        ? formData.locations.filter(l => l !== loc)
-                        : [...formData.locations, loc];
-                      setFormData({ ...formData, locations: newLocs });
-                    }}
-                    className={`px-4 py-2 rounded-2xl text-sm border transition ${
-                      formData.locations.includes(loc)
-                        ? 'bg-black text-white border-black'
-                        : 'border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {loc}
-                  </button>
-                ))}
+              <p className="text-xs text-gray-500 mb-3">
+                Seven Eastern Idaho counties. Tap a county name to select or clear all of its markets.
+              </p>
+              <div className="space-y-4">
+                {COUNTIES.map(({ county, locations }) => {
+                  const allSelected = locations.every(l => formData.locations.includes(l));
+                  const someSelected = locations.some(l => formData.locations.includes(l));
+                  return (
+                    <div key={county}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLocs = allSelected
+                            ? formData.locations.filter(l => !locations.includes(l))
+                            : Array.from(new Set([...formData.locations, ...locations]));
+                          setFormData({ ...formData, locations: newLocs });
+                        }}
+                        className="flex items-center gap-2 mb-1.5 group"
+                      >
+                        <span className={`text-xs font-semibold uppercase tracking-wider ${
+                          someSelected ? 'text-gray-900' : 'text-gray-400'
+                        } group-hover:text-emerald-600`}>
+                          {county} County
+                        </span>
+                        <span className="text-[10px] text-gray-400 group-hover:text-emerald-600">
+                          {allSelected ? 'clear all' : 'select all'}
+                        </span>
+                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        {locations.map(loc => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => {
+                              const newLocs = formData.locations.includes(loc)
+                                ? formData.locations.filter(l => l !== loc)
+                                : [...formData.locations, loc];
+                              setFormData({ ...formData, locations: newLocs });
+                            }}
+                            className={`px-3.5 py-1.5 rounded-2xl text-sm border transition ${
+                              formData.locations.includes(loc)
+                                ? 'bg-black text-white border-black'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

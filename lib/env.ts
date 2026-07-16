@@ -46,7 +46,7 @@ export const ENV_REQUIREMENTS = {
     'CRON_SECRET',
   ],
   demoSafeFallbacks: [
-    'Uses built-in Jefferson County demo data when Navica keys absent',
+    'Uses built-in Eastern Idaho demo data when Navica keys absent',
     'AI falls back to simulated responses',
     'Supabase uses demo placeholders',
   ],
@@ -83,7 +83,7 @@ export function validateEnv(): EnvValidationResult {
 
   // Navica / real data
   if (!process.env.NAVICA_IDX_URL || !process.env.NAVICA_API_KEY) {
-    const msg = 'NAVICA_IDX_URL / NAVICA_API_KEY not set — using high-quality Jefferson County demo listings';
+    const msg = 'NAVICA_IDX_URL / NAVICA_API_KEY not set — using high-quality Eastern Idaho demo listings';
     if (!isDemo) warnings.push(msg); else warnings.push(msg);
   }
 

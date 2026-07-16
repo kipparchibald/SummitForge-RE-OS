@@ -1,5 +1,5 @@
 // World-Class Council - Multi-AI Orchestrator powered by real LLMs
-// Trained on deep real estate domain knowledge + Jefferson County data
+// Trained on deep real estate domain knowledge + Eastern Idaho market data
 
 import { callLLM, SYSTEM_PROMPTS } from './client';
 import { marketingAgent } from '../marketing/agent';

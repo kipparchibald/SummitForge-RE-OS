@@ -3,10 +3,15 @@
 // Attaches listingSnapshot + alertName so UI works without joins
 
 import { Alert, Listing, AlertMatch } from '@/types/alerts';
+import { normalizeLocation } from '@/lib/geo/counties';
 
 export function calculateMatchScore(alert: Alert, listing: Listing): number {
-  // Hard location filter
-  if (!alert.locations.includes(listing.location)) {
+  // Hard location filter. Both sides are normalized so alerts saved before the
+  // multi-county expansion (e.g. 'Idaho Falls Area') still match today's
+  // listings ('Idaho Falls') instead of silently going dead.
+  const listingLocation = normalizeLocation(listing.location);
+  const alertLocations = alert.locations.map(normalizeLocation);
+  if (!alertLocations.includes(listingLocation)) {
     return 0;
   }
 

@@ -53,7 +53,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Command Center</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Archibald-Bagley • Jefferson County, ID
+            Archibald-Bagley • Eastern Idaho
             <span className="ml-2 text-xs text-gray-400">
               ({storeMode === 'supabase' ? 'Supabase' : 'Local'} store)
             </span>

@@ -9,12 +9,33 @@ import { queryListings } from '../../lib/supabase/client';
 import { fuzzyFilterListings } from '../../lib/import/listings';
 import { setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from '../../lib/import/recentListings';
 import { isDemoMode } from '@/lib/env';
+import { COVERAGE_COUNTIES_LABEL } from '@/lib/geo/counties';
 
 interface SampleListing {
   address: string;
   price: number;
   acres?: number;
 }
+
+// Representative land values across the seven covered counties. These are demo
+// figures for the preview experience — once the Navica feed is live these get
+// derived from imported comps rather than hardcoded.
+const LAND_VALUE_BY_MARKET: {
+  market: string;
+  county: string;
+  perAcre: number;
+  rising?: boolean;
+}[] = [
+  { market: 'Driggs', county: 'Teton', perAcre: 62500, rising: true },
+  { market: 'Rexburg', county: 'Madison', perAcre: 38900, rising: true },
+  { market: 'Idaho Falls', county: 'Bonneville', perAcre: 34200, rising: true },
+  { market: 'Rigby', county: 'Jefferson', perAcre: 27800, rising: true },
+  { market: 'Pocatello', county: 'Bannock', perAcre: 24100 },
+  { market: 'Roberts', county: 'Jefferson', perAcre: 21600, rising: true },
+  { market: 'Blackfoot', county: 'Bingham', perAcre: 19300 },
+  { market: 'St. Anthony', county: 'Fremont', perAcre: 17500 },
+  { market: 'Terreton', county: 'Jefferson', perAcre: 14200 },
+];
 
 export default function AnalyticsDashboard() {
   const [lastImport, setLastImport] = useState('2026-06-15');
@@ -89,7 +110,7 @@ export default function AnalyticsDashboard() {
       <div className="page-header flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1>Analytics &amp; Forecasting</h1>
-          <p>Jefferson County • Real-time insights powered by Navica data</p>
+          <p>Eastern Idaho • Real-time insights powered by Navica data</p>
         </div>
         
         <div className="flex items-center gap-3 self-start">
@@ -120,7 +141,8 @@ export default function AnalyticsDashboard() {
           </div>
           <div>
             <div className="text-sm text-gray-500">Coverage</div>
-            <div className="text-3xl font-semibold mt-1">Jefferson County</div>
+            <div className="text-3xl font-semibold mt-1">Eastern Idaho</div>
+            <div className="text-xs text-gray-500 mt-1">{COVERAGE_COUNTIES_LABEL}</div>
           </div>
         </div>
       </div>
@@ -146,11 +168,23 @@ export default function AnalyticsDashboard() {
         
         {/* Land Development */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <h3 className="font-semibold text-lg mb-4">Land Development Potential</h3>
-          <div className="space-y-3 text-sm">
-            <div>Hamer: <span className="font-medium">$18,400/acre</span> <span className="text-green-600">↑</span></div>
-            <div>Terreton: <span className="font-medium">$14,200/acre</span></div>
-            <div>Roberts: <span className="font-medium">$21,600/acre</span> <span className="text-green-600">↑</span></div>
+          <h3 className="font-semibold text-lg mb-1">Land Development Potential</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Representative $/acre by market{isDemoMode() ? ' — demo values until the live feed is connected' : ''}
+          </p>
+          <div className="space-y-2.5 text-sm">
+            {LAND_VALUE_BY_MARKET.map(({ market, county, perAcre, rising }) => (
+              <div key={market} className="flex items-baseline justify-between gap-2">
+                <span>
+                  {market}
+                  <span className="text-[10px] text-gray-400 ml-1.5">{county}</span>
+                </span>
+                <span>
+                  <span className="font-medium">${perAcre.toLocaleString()}/acre</span>
+                  {rising && <span className="text-green-600 ml-1">↑</span>}
+                </span>
+              </div>
+            ))}
           </div>
           <button className="mt-6 w-full border border-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
             View Full Land Analysis

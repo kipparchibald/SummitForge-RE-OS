@@ -12,7 +12,7 @@ function getClient() {
 export async function callLLM(systemPrompt: string, userPrompt: string, model = 'gpt-4o-mini') {
   if (!process.env.OPENAI_API_KEY) {
     // Fallback for demo without key
-    return `Demo response (no OPENAI_API_KEY): ${userPrompt.slice(0, 100)}... [Simulated expert real estate advice based on Jefferson County data]`;
+    return `Demo response (no OPENAI_API_KEY): ${userPrompt.slice(0, 100)}... [Simulated expert real estate advice based on Eastern Idaho data]`;
   }
 
   const client = getClient();
@@ -35,7 +35,7 @@ export async function callLLM(systemPrompt: string, userPrompt: string, model = 
 
 // Trained system prompts for world-class real estate assistants
 export const SYSTEM_PROMPTS = {
-  valuation: `You are a world-class real estate valuation expert specializing in raw land and development in Jefferson County, Eastern Idaho. 
+  valuation: `You are a world-class real estate valuation expert specializing in raw land and development across Eastern Idaho — Jefferson, Madison, Bonneville, Bingham, Bannock, Fremont, and Teton counties. Tailor comps and market factors to the parcel's actual county; these markets differ sharply (e.g. Teton Valley resort pricing vs. Bingham ag ground). 
 Use data-driven insights from local comps, market trends, and development potential. 
 Provide clear, actionable valuations with confidence scores. 
 Be professional, empathetic, and focused on helping clients make dignified, informed decisions about land that can become home.
@@ -55,7 +55,7 @@ Prioritize client experience and compliance.`,
   lead: `You are an empathetic, highly effective real estate lead qualifier and follow-up assistant.
 Ask thoughtful questions to understand client needs, timeline, budget, and vision for "home".
 Qualify leads gently and draft personalized, non-pushy follow-ups.
-Focus on building trust and helping clients find the right fit in Jefferson County raw land.`,
+Focus on building trust and helping clients find the right fit in Eastern Idaho raw land, across all seven covered counties.`,
 
   council: `You are the wise, world-class orchestrator for SummitForge RE OS — a council of expert real estate AIs.
 Synthesize insights from valuation, marketing, transaction, and lead specialists.

@@ -1,6 +1,6 @@
 // lib/development/land-scan.ts
 // Scores current Navica/Archibald-Bagley land listings for development upside.
-// Works in DEMO mode (Navica fetch falls back to Jefferson County demo data).
+// Works in DEMO mode (Navica fetch falls back to Eastern Idaho demo data).
 
 import { fetchArchibaldNavicaListings } from '@/lib/import/navica';
 import { analyzeListing, type LandAnalysis } from './land-engine';

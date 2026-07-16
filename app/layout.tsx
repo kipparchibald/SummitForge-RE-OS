@@ -4,7 +4,7 @@ import { isDemoMode, validateEnv } from '@/lib/env'
 
 export const metadata = {
   title: 'SummitForge RE OS',
-  description: 'Real Estate Operating System for Jefferson County / Eastern Idaho - Raw Land, Development & AI-Powered Tools',
+  description: 'Real Estate Operating System for Eastern Idaho - Raw Land, Development & AI-Powered Tools',
   icons: { icon: '/favicon.ico' },
 }
 
@@ -152,7 +152,7 @@ export default function RootLayout({
           <aside className="w-64 bg-white border-r min-h-screen p-6 hidden lg:block">
             <div className="mb-8">
               <Link href="/" className="font-semibold text-2xl tracking-tight" style={{ color: 'var(--primary)' }} data-company-name>SummitForge</Link>
-              <div className="text-xs text-gray-500" data-tagline>RE OS • Jefferson County / Eastern Idaho</div>
+              <div className="text-xs text-gray-500" data-tagline>RE OS • Eastern Idaho</div>
             </div>
             <nav className="space-y-1 text-sm">
               <Link href="/" className="block px-3 py-2 rounded-lg hover:bg-gray-100 font-medium">Dashboard</Link>
@@ -197,7 +197,7 @@ export default function RootLayout({
               </div>
 
               <div className="flex items-center gap-4 text-sm text-gray-500 hidden sm:flex">
-                <span className="px-2 py-0.5 rounded bg-gray-100 text-xs">Jefferson County, ID</span>
+                <span className="px-2 py-0.5 rounded bg-gray-100 text-xs">Eastern Idaho • 7 counties</span>
                 <span className="hidden md:inline">Raw Land • Development • AI</span>
                 <a href="tel:2087455911" className="font-medium text-gray-700 hover:text-[var(--primary)]" data-phone>(208) 745-5911</a>
                 {/* Live status badge (hydrated from localStorage + recentListings lastSync) */}

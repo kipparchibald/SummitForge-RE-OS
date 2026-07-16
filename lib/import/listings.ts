@@ -5,6 +5,7 @@ import { saveListings } from '../supabase/client';
 import { safeFetch } from '../net/safeFetch';
 import { findMatchesForListing } from '@/lib/alerts/matching';
 import { processMatchesForNotification } from '@/lib/alerts/notifications';
+import { mapCityToLocation } from '@/lib/geo/counties';
 import type { Alert, Listing as AlertListing } from '@/types/alerts';
 
 export interface NormalizedListing {
@@ -220,17 +221,6 @@ function normalizeRow(row: any, source: string): NormalizedListing | null {
   } catch {
     return null;
   }
-}
-
-function mapCityToLocation(city: string): any {
-  const normalized = (city || '').toLowerCase().trim();
-  if (normalized.includes('rigby')) return 'Rigby';
-  if (normalized.includes('ririe')) return 'Ririe';
-  if (normalized.includes('roberts')) return 'Roberts';
-  if (normalized.includes('hamer')) return 'Hamer';
-  if (normalized.includes('terreton') || normalized.includes('mud lake')) return 'Terreton';
-  if (normalized.includes('idaho falls')) return 'Idaho Falls Area';
-  return 'Other';
 }
 
 function mapPropertyType(type: string): any {

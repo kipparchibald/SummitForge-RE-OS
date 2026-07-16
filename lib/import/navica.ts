@@ -1,7 +1,7 @@
 // lib/import/navica.ts
 // Live connection to Archibald-Bagley Navica / Snake River MLS IDX feed
 // Supports RESO Web API style (JSON), simple JSON arrays, or custom endpoints.
-// Falls back gracefully to realistic demo data for Jefferson County raw land.
+// Falls back gracefully to realistic demo data for Eastern Idaho raw land.
 
 import { NormalizedListing } from './listings';
 import { setRecentListings } from './recentListings';
@@ -20,7 +20,10 @@ export interface NavicaFetchResult {
   error?: string;
 }
 
-// Realistic demo data modeled on actual Archibald-Bagley / Jefferson County land (from public site patterns)
+// Realistic demo data modeled on Archibald-Bagley land listings (from public site
+// patterns), spanning all seven Eastern Idaho counties in lib/geo/counties.ts so
+// the demo reflects real coverage. Live feeds replace this entirely — coverage
+// there is set by the $filter in NAVICA_IDX_URL, not by code.
 const DEMO_NAVICA_LAND: any[] = [
   {
     'MLS #': '2185506',
@@ -74,14 +77,140 @@ const DEMO_NAVICA_LAND: any[] = [
     'Property Type': 'Land',
     'Public Remarks': 'Excellent raw land opportunity. Good water rights potential.',
   },
+  // --- Madison County ---
+  {
+    'MLS #': 'DEMO-2190144',
+    'Street Address': '2200 W 7000 S',
+    City: 'Rexburg',
+    State: 'ID',
+    'List Price': 1450000,
+    Acres: 28.5,
+    'Property Type': 'Land',
+    'Public Remarks': 'Development ground near BYU-Idaho growth corridor. Student housing or single-family potential.',
+  },
+  {
+    'MLS #': 'DEMO-2190871',
+    'Street Address': 'TBD N Center',
+    City: 'Sugar City',
+    State: 'ID',
+    'List Price': 395000,
+    Acres: 6.2,
+    'Property Type': 'Vacant Land',
+    'Public Remarks': 'Infill acreage in fast-growing Sugar City. Utilities at the street.',
+  },
+  // --- Bonneville County ---
+  {
+    'MLS #': 'DEMO-2188420',
+    'Street Address': '4500 E Sunnyside',
+    City: 'Idaho Falls',
+    State: 'ID',
+    'List Price': 2350000,
+    Acres: 47.3,
+    'Property Type': 'Land',
+    'Public Remarks': 'Prime Sunnyside corridor development parcel. Annexation-ready, high traffic count.',
+  },
+  {
+    'MLS #': 'DEMO-2189003',
+    'Street Address': 'L3B1 Ammon Rd',
+    City: 'Ammon',
+    State: 'ID',
+    'List Price': 720000,
+    Acres: 9.1,
+    'Property Type': 'Land',
+    'Public Remarks': 'Residential development lot in Ammon city limits. Sewer available.',
+  },
+  {
+    'MLS #': 'DEMO-2187666',
+    'Street Address': '155 Snake River Rd',
+    City: 'Swan Valley',
+    State: 'ID',
+    'List Price': 1180000,
+    Acres: 22,
+    'Property Type': 'Land',
+    'Public Remarks': 'Recreational acreage with river frontage. Cabin or short-term rental potential.',
+  },
+  // --- Bingham County ---
+  {
+    'MLS #': 'DEMO-2186540',
+    'Street Address': 'TBD 800 N',
+    City: 'Firth',
+    State: 'ID',
+    'List Price': 340000,
+    Acres: 12.4,
+    'Property Type': 'Land',
+    'Public Remarks': 'Irrigated farm ground with building site. Water shares included.',
+  },
+  // --- Bannock County ---
+  {
+    'MLS #': 'DEMO-2191200',
+    'Street Address': '900 S 5th Ave',
+    City: 'Pocatello',
+    State: 'ID',
+    'List Price': 1650000,
+    Acres: 34.8,
+    'Property Type': 'Land',
+    'Public Remarks': 'Bench development parcel with valley views. Zoned for mixed residential density.',
+  },
+  {
+    'MLS #': 'DEMO-2191455',
+    'Street Address': 'TBD Yellowstone Ave',
+    City: 'Chubbuck',
+    State: 'ID',
+    'List Price': 890000,
+    Acres: 8.7,
+    'Property Type': 'Vacant Land',
+    'Public Remarks': 'Commercial-adjacent acreage on Yellowstone corridor. Utilities to lot line.',
+  },
+  // --- Fremont County ---
+  {
+    'MLS #': 'DEMO-2188190',
+    'Street Address': '3100 N 2000 E',
+    City: 'St. Anthony',
+    State: 'ID',
+    'List Price': 545000,
+    Acres: 19.6,
+    'Property Type': 'Land',
+    'Public Remarks': 'Sand dunes recreation access. Great agritourism or RV park potential.',
+  },
+  {
+    'MLS #': 'DEMO-2188777',
+    'Street Address': 'Lot 12 Island Park Village',
+    City: 'Island Park',
+    State: 'ID',
+    'List Price': 425000,
+    Acres: 3.1,
+    'Property Type': 'Vacant Land',
+    'Public Remarks': 'Treed cabin lot near Henrys Lake. Strong short-term rental market.',
+  },
+  // --- Teton County ---
+  {
+    'MLS #': 'DEMO-2192010',
+    'Street Address': 'TBD Ski Hill Rd',
+    City: 'Driggs',
+    State: 'ID',
+    'List Price': 1975000,
+    Acres: 15.2,
+    'Property Type': 'Land',
+    'Public Remarks': 'Teton view acreage on Ski Hill corridor. Grand Targhee access, subdivision potential.',
+  },
+  {
+    'MLS #': 'DEMO-2192388',
+    'Street Address': '450 Baseline Rd',
+    City: 'Victor',
+    State: 'ID',
+    'List Price': 860000,
+    Acres: 10.4,
+    'Property Type': 'Land',
+    'Public Remarks': 'Valley floor parcel minutes from Teton Pass. Water rights, mountain views.',
+  },
 ];
 
 export async function fetchArchibaldNavicaListings(limit = 50, filters?: { search?: string; minAcres?: number; location?: string; maxPrice?: number }): Promise<NavicaFetchResult> {
   const lastSync = new Date().toISOString();
 
-  // DEMO / no credentials path — always high quality Jefferson raw land data
+  // DEMO / no credentials path — always high quality Eastern Idaho raw land data
   if (!NAVICA_URL || !NAVICA_KEY) {
-    console.log('[Navica] No live credentials configured. Using high-quality demo data for Jefferson County.');
+    console.log('[Navica] No live credentials configured. Using high-quality demo data across Eastern Idaho.');
     let normalized = DEMO_NAVICA_LAND.map(row => normalizeNavicaRow(row, 'navica-demo')).filter(Boolean) as NormalizedListing[];
     let land = normalized.filter(l => l.acres && l.acres > 0.5);
 

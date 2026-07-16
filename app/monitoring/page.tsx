@@ -123,7 +123,7 @@ export default function MonitoringDashboard() {
       <div className="page-header flex items-center justify-between">
         <div>
           <h1>GIS Monitoring</h1>
-          <p>Track raw land opportunities in Jefferson County. Click parcels to analyze and run pro formas.</p>
+          <p>Track raw land opportunities across Eastern Idaho. Click parcels to analyze and run pro formas.</p>
         </div>
         {/* Last pulled / live status indicator (shared mechanism) */}
         <span className={`ml-4 px-3 py-1 text-xs rounded-full border font-medium ${syncIsRecent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : lastPull ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
@@ -134,7 +134,7 @@ export default function MonitoringDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Map Section */}
         <div>
-          <h2 className="text-xl mb-2">Interactive Parcel Map (Jefferson County Area)</h2>
+          <h2 className="text-xl mb-2">Interactive Parcel Map (Eastern Idaho)</h2>
           <div className="h-[500px] border rounded-lg overflow-hidden">
             {MAPBOX_TOKEN ? (
               <Map

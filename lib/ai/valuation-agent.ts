@@ -1,4 +1,4 @@
-// World-class Valuation Agent - AI trained on Jefferson County raw land data + expert knowledge
+// World-class Valuation Agent - AI trained on Eastern Idaho raw land data + expert knowledge
 
 import { callLLM, SYSTEM_PROMPTS } from './client';
 
@@ -11,7 +11,7 @@ export class ValuationAgent {
 User profile: ${JSON.stringify(userProfile || {}, null, 2)}
 
 Provide a professional valuation analysis with:
-- Adjusted estimated value considering raw land specifics in Jefferson County
+- Adjusted estimated value considering raw land specifics in the parcel's county (Eastern Idaho: Jefferson, Madison, Bonneville, Bingham, Bannock, Fremont, Teton)
 - Key comps and market factors
 - Personalized insights based on user preferences
 - Actionable recommendations for development or sale
@@ -45,7 +45,7 @@ Format as clear, empathetic advice.`;
     const insights = [];
     
     if (userProfile?.preferences?.focusAreas?.includes('raw land')) {
-      insights.push(`This ${property.acres} acre parcel in Jefferson County aligns strongly with raw land development goals. Cluster or conservation layout could maximize yield while preserving views.`);
+      insights.push(`This ${property.acres} acre parcel aligns strongly with raw land development goals. Cluster or conservation layout could maximize yield while preserving views.`);
     }
     
     if (userProfile?.preferences?.locationFocus) {
