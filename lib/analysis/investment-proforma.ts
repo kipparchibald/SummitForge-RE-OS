@@ -1,5 +1,7 @@
 // Expanded investment pro formas for raw land and other types
 
+import { analyzeListing, type LandAnalysis } from '../development/land-engine';
+
 export interface ProFormaResult {
   lotYield: number;
   estInfraCost: number;
@@ -71,4 +73,22 @@ export function calculateInvestmentProForma(property: any, type: 'multifamily' |
     message: `${type} pro forma coming soon`,
     estimatedCapRate: 6.5
   };
+}
+
+/**
+ * Accurate raw-land feasibility with a maximum-offer price and Offer/Pass verdict.
+ * Uses the calibrated land-engine (county-aware presets, ISPWC costs, financing carry,
+ * absorption, target margin). Returns null if the listing lacks acres or price.
+ *
+ * This is the recommended entry point for buy/pass decisions; calculateRawLandProForma
+ * remains for the simpler legacy IRR view.
+ */
+export function calculateLandFeasibility(
+  listing: any,
+  assumptions: { lotPrice?: number; county?: string } = {}
+): LandAnalysis | null {
+  return analyzeListing(
+    { acres: listing?.acres, price: listing?.price ?? listing?.listPrice, address: listing?.address, rawData: listing?.rawData },
+    assumptions
+  );
 }

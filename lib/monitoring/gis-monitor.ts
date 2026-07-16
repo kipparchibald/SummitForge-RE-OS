@@ -36,8 +36,9 @@ export async function checkForNewOpportunities(watchedAreaId?: string) {
     .eq('property_type', 'land')
     .gte('updated_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
+  let area = null;
   if (watchedAreaId) {
-    const area = await getWatchedArea(watchedAreaId);
+    area = await getWatchedArea(watchedAreaId);
     if (area?.geometry) {
       // Enhanced: Use ST_DWithin for proximity + intersects for efficiency
       query = query
@@ -50,8 +51,19 @@ export async function checkForNewOpportunities(watchedAreaId?: string) {
 
   if (error) throw error;
 
-  const newOpportunities = recentProperties?.filter(p => {
-    return (p.acres || 0) > (area?.filters?.minAcres || 0);
+  const filters = area?.filters;
+  const newOpportunities = recentProperties?.filter((p: any) => {
+    const acres = p.acres || 0;
+    // Apply every declared filter, not just minAcres. Use >= so a parcel exactly
+    // at the threshold qualifies.
+    if (filters?.minAcres != null && acres < filters.minAcres) return false;
+    if (filters?.maxPricePerAcre != null && acres > 0 && p.price != null) {
+      if (p.price / acres > filters.maxPricePerAcre) return false;
+    }
+    if (filters?.zoning && filters.zoning.length > 0) {
+      if (!p.zoning || !filters.zoning.includes(p.zoning)) return false;
+    }
+    return true;
   }) || [];
 
   for (const prop of newOpportunities) {

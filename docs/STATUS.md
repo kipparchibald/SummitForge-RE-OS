@@ -1,52 +1,40 @@
-# SummitForge RE OS — Status
+# SummitForge RE OS — Build Status
 
-**Version:** 0.4.0  
-**Date:** 2026-07-15  
-**Maturity:** ~8.6 / 10  
+**Product:** Real estate operating system (land, development, brokerage, AI agents)  
+**Repo:** `SummitForge-RE-OS` only  
+**Stack:** Next.js 15 + Supabase + domain agents  
 
-## Latest batch (this push)
+**Not this product:** IdeaSpeak (`ideaspeak-app`) is a separate voice-first *app builder*. Do not merge IdeaSpeak features or status into this repo.
 
-| Feature | Route / location | Status |
-|---------|------------------|--------|
-| Client portal + voice UI | `/portal` | Live (PIN unlock, matches, voice transcript) |
-| Idaho forms auto-populate + e-sign sim | `/forms` | Live (RE-21/24/14/16 + disclosures + signature flow) |
-| Predictive analytics charts | `/analytics` + `components/PredictiveCharts.tsx` | Live (Rigby/Ririe $/sqft, absorption, DOM, forecast) |
-| White-label publish | `/publish` | Live (tenant picker, modules, one-click publish sim) |
-| Nav updates | Sidebar | Portal, Forms, Publish linked |
+**Last updated:** July 16, 2026
 
-## Existing core
+---
 
-- Dashboard command center + Auto-Import toggle
-- Property Alerts + matching engine + dual store (local / Supabase)
-- Transaction Coordinator
-- CMA, Land, Mortgage, Marketing, GIS Monitor
-- Navica import pipeline
-- Branding tokens
+## Current Score: **5.5 / 10**
 
-## Pull & run
+### Done recently
+- **Merged `feature/land-development-engine` into `main`** — the two lines had diverged since July 3; both feature sets now live together
+- Land feasibility + comps-driven plat engine (`/development/land-deals`)
+- Live Navica/MLS import + Supabase persistence + hourly cron sync
+- AI assistant agents (Valuation, Marketing, Council, Transaction, Lead)
+- Security fixes: fail-closed cron auth, SSRF guard on import, escaped digest email
+- Alert matching engine now runs on every import path (CSV, URL, live Navica)
+- Client portal with voice AI, Idaho forms + e-sign, predictive charts, publish flow
 
-```bash
-cd ~/SummitForge-RE-OS
-git pull origin main
-npm install
-npm run dev
-```
+### Next (this repo only)
+1. Branding theme variables end-to-end
+2. Analytics UI consistency
+3. Real Navica credentials + production Supabase
+4. Replace demo stats on dashboard with live queries
 
-Open:
-- http://localhost:3000 — Dashboard  
-- /portal — Client portal (PIN: `demo` or any 4+ chars)  
-- /forms — Populate + sign Idaho forms  
-- /analytics — Predictive charts  
-- /publish — White-label package  
+---
 
-## Next recommended
+## Boundaries
 
-1. Real Form Simplicity / DocuSign API  
-2. Real-time Supabase match subscriptions (if not fully wired)  
-3. Voice AI full phone integration (Grok Voice Agent)  
-4. Automated Navica IDX polling with credentials  
-5. Stripe / billing for multi-tenant SaaS  
+| | SummitForge | IdeaSpeak |
+|--|-------------|-----------|
+| Purpose | RE OS for land / deals / brokerage | Build any app by voice with Grok |
+| Repo | `SummitForge-RE-OS` | `ideaspeak-app` |
+| Work here? | Yes | No — open that repo |
 
-## Parallel build note
-
-Safe to keep Grok Build in terminal open. After each push: `git pull origin main` then refresh browser.
+When an agent or human is in this workspace, only change SummitForge.

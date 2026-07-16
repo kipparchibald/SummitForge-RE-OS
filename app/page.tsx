@@ -125,7 +125,9 @@ export default function DashboardPage() {
                 <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe predictive charts" />
                 <QuickLink href="/publish" label="Publish White-Label" desc="Package for other brokerages" />
                 <QuickLink href="/cma" label="CMA Builder" desc="Comparative market analysis" />
-                <QuickLink href="/land" label="Land Development" desc="Plat & utility estimates" />
+                <QuickLink href="/development/land-deals" label="Land Deals Engine" desc="Comps-driven plat design & feasibility" />
+                <QuickLink href="/ai-assistants" label="AI Assistants" desc="Valuation, marketing, council, transaction" />
+                <QuickLink href="/monitoring" label="GIS Monitoring" desc="Live parcel tracking & zoning alerts" />
                 <QuickLink href="/marketing" label="Marketing Agent" desc="Campaign plans & execution" />
               </div>
             </div>

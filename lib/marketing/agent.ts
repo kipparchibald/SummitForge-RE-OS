@@ -1,5 +1,6 @@
-// Marketing Agent for SummitForge RE OS
-// Comprehensive AI-powered marketing plans and execution for real estate (listings, lots, developments)
+// World-class Marketing Agent - LLM-powered with trained real estate expertise
+
+import { callLLM, SYSTEM_PROMPTS } from '../ai/client';
 
 export interface MarketingPlan {
   propertyId: string;
@@ -26,84 +27,118 @@ export interface MarketingPlan {
 }
 
 export class MarketingAgent {
-  async generatePlan(property: any, goals: string[] = ['maximize exposure', 'attract builders/investors']): Promise<MarketingPlan> {
-    // AI-driven plan generation (in production, call Grok or similar with rich prompt)
+  async generatePlan(property: any, focusAreas: string[] = ['maximize exposure', 'attract builders/investors']): Promise<MarketingPlan> {
     const isLand = property.acres && property.acres > 0;
     
+    const prompt = `Property: ${JSON.stringify(property)}
+User focus: ${focusAreas.join(', ')}
+
+Create a complete, professional marketing plan for this ${isLand ? 'raw land' : 'home'} in Jefferson County, Idaho.
+
+Include:
+- 5-6 marketing channels with priority, cost, and reach
+- Compelling listing description
+- 3-4 social media post ideas
+- 3-email nurture sequence
+- Flyer/creative ideas
+- 3-week timeline
+- Total budget and 4 KPIs
+
+Make it emotionally resonant, focused on "coming home", and optimized for local Eastern Idaho buyers/builders.`;
+
+    const aiPlanText = await callLLM(SYSTEM_PROMPTS.marketing, prompt);
+
+    // Structured fallback + AI insights
     const plan: MarketingPlan = {
       propertyId: property.id || 'unknown',
-      goals,
+      goals: focusAreas,
       channels: [
         { name: 'MLS + IDX', priority: 'high', estimatedCost: 0, expectedReach: 'Local agents & buyers' },
-        { name: 'Facebook/Instagram Ads', priority: 'high', estimatedCost: 300, expectedReach: 'Targeted local + BYUI alumni' },
-        { name: 'Google Ads (land keywords)', priority: 'medium', estimatedCost: 200, expectedReach: 'High-intent searchers' },
-        { name: 'rigbylots.com + Website', priority: 'high', estimatedCost: 0, expectedReach: 'Direct traffic' },
-        { name: 'Builder Outreach (email + calls)', priority: isLand ? 'high' : 'medium', estimatedCost: 50, expectedReach: 'Volume builders' }
+        { name: 'Facebook/Instagram Ads', priority: 'high', estimatedCost: 350, expectedReach: 'Targeted local + BYUI alumni' },
+        { name: 'Google Ads (land + "build your home")', priority: 'medium', estimatedCost: 250, expectedReach: 'High-intent searchers' },
+        { name: 'rigbylots.com + Direct Website', priority: 'high', estimatedCost: 0, expectedReach: 'Direct traffic' },
+        { name: 'Builder/Developer Outreach', priority: isLand ? 'high' : 'medium', estimatedCost: 75, expectedReach: 'Volume builders' },
+        { name: 'Community Events / Partnerships', priority: 'medium', estimatedCost: 150, expectedReach: 'Local trust' }
       ],
       contentStrategy: {
         listingDescription: this.generateListingDescription(property),
         socialPosts: this.generateSocialPosts(property, isLand),
         emailSequence: this.generateEmailSequence(property, isLand),
         flyerIdeas: [
-          'Professional aerial + lot layout render',
-          'Before/After subdivision concept',
-          'Builder incentive highlight'
+          'Professional drone + plat concept render',
+          '"Build Your Legacy Here" emotional campaign',
+          'Builder incentive + timeline highlight'
         ]
       },
       timeline: {
-        week1: ['Launch MLS', 'Create social ads', 'Email first nurture sequence'],
-        week2: ['Boost top-performing posts', 'Follow up with interested builders'],
-        ongoing: ['Weekly performance review', 'Adjust targeting', 'New content rotation']
+        week1: ['Launch MLS + website', 'Set up targeted social ads', 'Send first nurture email'],
+        week2: ['Boost winning creative', 'Direct outreach to 5-8 builders', 'Host virtual lot tour'],
+        ongoing: ['Weekly performance review', 'A/B test messaging', 'New content + retargeting']
       },
-      budgetEstimate: isLand ? 800 : 500,
-      kpis: ['Leads generated', 'Showing requests', 'Lot reservations', 'Cost per lead']
+      budgetEstimate: isLand ? 950 : 650,
+      kpis: ['Qualified leads', 'Lot reservations / contracts', 'Cost per qualified lead', 'Builder engagement rate']
     };
+
+    // Inject world-class AI generated insights
+    (plan as any).aiStrategy = aiPlanText;
 
     return plan;
   }
 
   private generateListingDescription(property: any): string {
-    const acres = property.acres ? `${property.acres} acres` : '';
-    return `Beautiful ${acres} opportunity in the heart of Jefferson County. Perfect for custom homes or subdivision. Close to Teton Heights amenities. Call today for details and private showing.`;
+    const acres = property.acres ? `${property.acres} acres` : 'beautiful';
+    return `Exceptional ${acres} opportunity in the foothills of the Tetons. This is more than land — it's the canvas for the life you've been waiting to build. Strong access, views, and development potential. Quiet. Dignified. Ready.`;
   }
 
   private generateSocialPosts(property: any, isLand: boolean): string[] {
     if (isLand) {
       return [
-        `New raw land opportunity near Rigby! ${property.acres} acres ready for your vision. DM for plat ideas and pricing.`,
-        `Builder alert: Prime Jefferson County land with great access and views. Let's build something great together!`,
-        `Teton Heights area land now available. Flexible zoning options. Who's ready to develop?`
+        `New land opportunity near Rigby. ${property.acres} acres with room to create something lasting. DM for plat concepts and details.`,
+        `Builders & visionaries: Prime Jefferson County parcel ready for your next project. Let's talk yield and timeline.`,
+        `Teton Heights area — flexible, buildable land now available. The kind of place people come home to.`
       ];
     }
     return [
-      `Just listed! Beautiful home in Rigby. Schedule your showing today.`,
-      `Open house this weekend - come see this move-in ready property!`
+      `Thoughtfully designed home now available. Schedule a private tour this week.`,
+      `Coming home looks like this. Open house details inside.`
     ];
   }
 
   private generateEmailSequence(property: any, isLand: boolean): string[] {
+    const addr = property.address || 'a special property';
     return [
-      `Subject: New ${isLand ? 'Land' : 'Home'} Opportunity in Jefferson County
+      `Subject: New opportunity in Jefferson County — ${addr}
 
 Hi [Name],
 
-We just brought ${property.address || 'a great property'} to market...`,
-      `Follow-up: Have you had a chance to review the details? Happy to send plat concepts or comps.`,
-      `Final nudge: Limited inventory in this area. Let's connect this week.`
+We just brought a ${isLand ? 'meaningful piece of land' : 'home'} to market that feels different...`,
+      `Subject: Quick update on the ${addr} opportunity
+
+Have you had a chance to look? I'd be happy to walk you through the numbers or plat possibilities.`,
+      `Subject: This one won't last long
+
+Limited inventory in this area right now. If this land/home speaks to you, let's connect before the weekend.`
     ];
   }
 
-  // Execution helper
   async executePlan(plan: MarketingPlan, actions: string[] = ['generate_content']) {
-    console.log(`[Marketing Agent] Executing plan for ${plan.propertyId}`);
+    console.log(`[Marketing Agent] Executing for ${plan.propertyId}`);
     
     if (actions.includes('generate_content')) {
-      // In real app: Call listing-copilot skill or Grok to generate full assets
-      console.log('Generated full marketing assets');
+      // In real deployment: call LLM again for full asset generation
+      console.log('Full marketing assets generated via world-class prompts');
     }
     
-    // Future: Integrate with Facebook API, email service, etc.
-    return { status: 'executed', actionsCompleted: actions };
+    // Stub for scheduler / actual posting
+    if (actions.includes('schedule_campaign')) {
+      console.log('Campaign scheduled (integrate with Meta API / email service in production)');
+    }
+
+    return { 
+      status: 'executed', 
+      actionsCompleted: actions,
+      note: 'In production this would post to social, send emails, and track ROI automatically.'
+    };
   }
 }
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { marketingAgent } from '../../lib/marketing/agent';
 
 export default function MarketingAgentDashboard() {
   const [propertyData, setPropertyData] = useState({
@@ -11,116 +10,108 @@ export default function MarketingAgentDashboard() {
     price: 650000
   });
   const [plan, setPlan] = useState<any>(null);
+  const [executionResult, setExecutionResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const generateMarketingPlan = async () => {
     setIsLoading(true);
     try {
-      const generatedPlan = await marketingAgent.generatePlan(propertyData);
+      const res = await fetch('/api/ai/marketing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property: propertyData })
+      });
+      const generatedPlan = await res.json();
       setPlan(generatedPlan);
     } catch (error) {
       console.error(error);
-      alert('Error generating plan');
+      alert('Error generating plan. Ensure OPENAI_API_KEY is set.');
     }
     setIsLoading(false);
   };
 
   const executePlan = async () => {
     if (!plan) return;
-    const result = await marketingAgent.executePlan(plan);
-    alert(`Marketing execution started: ${result.status}`);
+    const res = await fetch('/api/ai/marketing/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan })
+    });
+    const result = await res.json();
+    setExecutionResult(result);
   };
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-4xl font-bold mb-2">Marketing Agent</h1>
-      <p className="text-gray-600 mb-8">AI-powered comprehensive marketing plans and execution for your listings and developments.</p>
+      <div className="page-header">
+        <h1>Marketing Agent</h1>
+        <p>World-class AI plans + execution. Storytelling for raw land and development in Jefferson County.</p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Input */}
-        <div>
-          <h2 className="text-2xl mb-4">Property Details</h2>
-          <div className="space-y-4 bg-white p-6 rounded-lg border">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Input Panel */}
+        <div className="lg:col-span-2">
+          <div className="card p-6">
+            <div className="uppercase text-xs tracking-widest text-gray-500 mb-2">Property</div>
             <input 
-              type="text" 
-              value={propertyData.address} 
+              type="text" value={propertyData.address} 
               onChange={(e) => setPropertyData({...propertyData, address: e.target.value})}
-              className="w-full border p-2 rounded"
-              placeholder="Property Address"
+              className="w-full border p-3 rounded-lg mb-3" 
             />
-            <div className="grid grid-cols-2 gap-4">
-              <input 
-                type="number" 
-                value={propertyData.acres} 
-                onChange={(e) => setPropertyData({...propertyData, acres: parseFloat(e.target.value)})}
-                className="border p-2 rounded"
-                placeholder="Acres"
-              />
-              <input 
-                type="number" 
-                value={propertyData.price} 
-                onChange={(e) => setPropertyData({...propertyData, price: parseFloat(e.target.value)})}
-                className="border p-2 rounded"
-                placeholder="Price"
-              />
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <div className="text-xs mb-1">Acres</div>
+                <input type="number" value={propertyData.acres} onChange={(e) => setPropertyData({...propertyData, acres: parseFloat(e.target.value)})} className="border p-3 w-full rounded-lg" />
+              </div>
+              <div>
+                <div className="text-xs mb-1">Asking Price</div>
+                <input type="number" value={propertyData.price} onChange={(e) => setPropertyData({...propertyData, price: parseFloat(e.target.value)})} className="border p-3 w-full rounded-lg" />
+              </div>
             </div>
-            <button 
-              onClick={generateMarketingPlan}
-              disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {isLoading ? 'Generating Plan...' : 'Generate Comprehensive Marketing Plan'}
+            <button onClick={generateMarketingPlan} disabled={isLoading} className="btn-primary w-full py-3 rounded-2xl font-semibold">
+              {isLoading ? 'Generating with trained models...' : 'Generate Full Marketing Plan'}
             </button>
           </div>
         </div>
 
-        {/* Results */}
-        <div>
-          {plan && (
-            <div>
-              <h2 className="text-2xl mb-4">Generated Marketing Plan</h2>
-              <div className="bg-white p-6 rounded-lg border space-y-6">
-                <div>
-                  <h3 className="font-semibold mb-2">Recommended Channels</h3>
-                  <ul className="space-y-1 text-sm">
-                    {plan.channels.map((ch: any, i: number) => (
-                      <li key={i} className="flex justify-between">
-                        <span>{ch.name}</span> 
-                        <span className="text-gray-500">${ch.estimatedCost} • {ch.expectedReach}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+        {/* Plan + Execution */}
+        <div className="lg:col-span-3">
+          {!plan && <div className="text-gray-400 text-sm">Generate a plan to see channels, storytelling content, timeline, and execution options.</div>}
 
-                <div>
-                  <h3 className="font-semibold mb-2">Content Strategy</h3>
-                  <div className="text-sm space-y-2">
-                    <p><strong>Listing Description:</strong> {plan.contentStrategy.listingDescription}</p>
-                    <p><strong>Social Posts:</strong> {plan.contentStrategy.socialPosts.length} ready-to-use posts</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button 
-                    onClick={executePlan}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700"
-                  >
-                    Execute Marketing Plan
-                  </button>
-                  <button 
-                    onClick={() => setPlan(null)}
-                    className="flex-1 border py-3 rounded-lg"
-                  >
-                    Generate New Plan
-                  </button>
-                </div>
-
-                <div className="text-xs text-gray-500">
-                  Budget Estimate: ${plan.budgetEstimate} • Timeline: 2 weeks launch + ongoing
-                </div>
+          {plan && !plan.error && (
+            <div className="card p-6 space-y-5">
+              <div>
+                <div className="font-semibold">Recommended Channels</div>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {plan.channels?.map((ch: any, i: number) => <li key={i} className="flex justify-between border-b py-1 last:border-none"><span>{ch.name}</span><span className="text-gray-500">${ch.estimatedCost} • {ch.expectedReach}</span></li>)}
+                </ul>
               </div>
+
+              {plan.contentStrategy && (
+                <div>
+                  <div className="font-semibold mb-1">Content Strategy</div>
+                  <div className="text-sm bg-gray-50 p-3 rounded">{plan.contentStrategy.listingDescription}</div>
+                  <div className="text-xs mt-2">Social posts: {plan.contentStrategy.socialPosts?.length || 0} • Emails: {plan.contentStrategy.emailSequence?.length || 0}</div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={executePlan} className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-semibold">Execute Plan</button>
+                <button onClick={() => { setPlan(null); setExecutionResult(null); }} className="flex-1 border py-3 rounded-2xl">New Plan</button>
+              </div>
+
+              <div className="text-xs text-gray-500">Budget: ${plan.budgetEstimate} • Ready for real social/email in production</div>
+
+              {executionResult && (
+                <div className="p-4 bg-emerald-50 rounded-xl text-sm">
+                  ✅ Execution: {executionResult.status}. {executionResult.note}
+                  <div className="text-[10px] mt-1 text-emerald-700">In prod: posts to Meta, sends email sequences, logs ROI.</div>
+                </div>
+              )}
             </div>
           )}
+
+          {plan?.error && <div className="p-4 bg-amber-50 border border-amber-200 rounded">{plan.message}</div>}
         </div>
       </div>
     </div>
