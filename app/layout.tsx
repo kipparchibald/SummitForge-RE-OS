@@ -1,6 +1,7 @@
 import './globals.css'
 import Link from 'next/link'
 import { isDemoMode, validateEnv } from '@/lib/env'
+import { deploymentBranding, deploymentBrandStyle, hasDeploymentBranding } from '@/lib/branding/deployment'
 
 export const metadata = {
   title: 'SummitForge RE OS',
@@ -16,9 +17,17 @@ export default function RootLayout({
   // Centralized: respects NEXT_PUBLIC_DEMO_MODE (default false = production locked)
   const isDemo = isDemoMode();
   const envStatus = validateEnv();
+  // Per-deployment defaults so a first-time visitor to a tenant's URL sees that
+  // tenant's brand immediately, before any localStorage exists.
+  const brand = deploymentBranding();
+  const hasEnvBrand = hasDeploymentBranding(brand);
 
   return (
-    <html lang="en" data-demo={isDemo ? 'on' : 'off'}>
+    <html
+      lang="en"
+      data-demo={isDemo ? 'on' : 'off'}
+      style={deploymentBrandStyle(brand)}
+    >
       <body className="bg-gray-50 min-h-screen">
         {/* Global Branding + Theme Loader (applies saved white-label instantly) */}
         <script
@@ -48,10 +57,13 @@ export default function RootLayout({
                     
                     const taglines = document.querySelectorAll('[data-tagline]');
                     if (b.tagline) taglines.forEach(el => el.textContent = b.tagline);
-                  } else {
-                    // PRODUCTION BRANDING LOCK (seamless): 
+                  } else if (!${JSON.stringify(hasEnvBrand)}) {
+                    // PRODUCTION BRANDING LOCK (seamless):
                     // If data-demo=off (prod) and no user-saved branding, apply clean professional default.
                     // Hides demo artifacts. User can still customize in /settings/branding.
+                    // Skipped entirely when the deployment carries its own brand
+                    // via NEXT_PUBLIC_BRAND_* — otherwise this would overwrite a
+                    // tenant's server-rendered name/tagline with SummitForge's.
                     const demoAttr = document.documentElement.getAttribute('data-demo');
                     const isProd = demoAttr === 'off';
                     if (isProd) {
@@ -151,8 +163,8 @@ export default function RootLayout({
           {/* Sidebar Navigation */}
           <aside className="w-64 bg-white border-r min-h-screen p-6 hidden lg:block">
             <div className="mb-8">
-              <Link href="/" className="font-semibold text-2xl tracking-tight" style={{ color: 'var(--primary)' }} data-company-name>SummitForge</Link>
-              <div className="text-xs text-gray-500" data-tagline>RE OS • Eastern Idaho</div>
+              <Link href="/" className="font-semibold text-2xl tracking-tight" style={{ color: 'var(--primary)' }} data-company-name>{brand.companyName || 'SummitForge'}</Link>
+              <div className="text-xs text-gray-500" data-tagline>{brand.tagline || 'RE OS • Eastern Idaho'}</div>
             </div>
             <nav className="space-y-1 text-sm">
               <Link href="/" className="block px-3 py-2 rounded-lg hover:bg-gray-100 font-medium">Dashboard</Link>
@@ -193,13 +205,13 @@ export default function RootLayout({
             {/* Top Bar */}
             <header className="border-b bg-white px-6 py-3 flex items-center justify-between">
               <div className="flex items-center gap-4 lg:hidden">
-                <Link href="/" className="font-semibold" style={{ color: 'var(--primary)' }} data-company-name>SummitForge</Link>
+                <Link href="/" className="font-semibold" style={{ color: 'var(--primary)' }} data-company-name>{brand.companyName || 'SummitForge'}</Link>
               </div>
 
               <div className="flex items-center gap-4 text-sm text-gray-500 hidden sm:flex">
                 <span className="px-2 py-0.5 rounded bg-gray-100 text-xs">Eastern Idaho • 7 counties</span>
                 <span className="hidden md:inline">Raw Land • Development • AI</span>
-                <a href="tel:2087455911" className="font-medium text-gray-700 hover:text-[var(--primary)]" data-phone>(208) 745-5911</a>
+                <a href={`tel:${(brand.phone || '(208) 745-5911').replace(/[^0-9]/g, '')}`} className="font-medium text-gray-700 hover:text-[var(--primary)]" data-phone>{brand.phone || '(208) 745-5911'}</a>
                 {/* Live status badge (hydrated from localStorage + recentListings lastSync) */}
                 <span
                   id="live-status-badge"
