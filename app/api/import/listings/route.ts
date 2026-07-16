@@ -9,12 +9,16 @@ export async function POST(request: NextRequest) {
     let input: any;
     let source: any = 'mls';
     let alerts: Alert[] = [];
+    let siteUrl: string | undefined;
 
     if (contentType.includes('application/json')) {
       const body = await request.json();
       if (body.live === 'navica' || body.source === 'navica') {
         input = 'live-navica';
         source = 'navica';
+      } else if (body.live === 'site' || body.source === 'idx-site') {
+        input = 'live-site';
+        source = 'idx-site';
       } else {
         input = body.url || body.file || body.input;
         source = body.source || 'mls';
@@ -22,6 +26,7 @@ export async function POST(request: NextRequest) {
       if (Array.isArray(body.alerts)) {
         alerts = body.alerts;
       }
+      if (typeof body.siteUrl === 'string') siteUrl = body.siteUrl;
     } else {
       // form data (existing CSV flow)
       const formData = await request.formData();
@@ -47,6 +52,7 @@ export async function POST(request: NextRequest) {
     const result = await importListings(input, source, {
       alerts,
       runMatching: alerts.length > 0,
+      siteUrl,
     });
 
     return NextResponse.json({

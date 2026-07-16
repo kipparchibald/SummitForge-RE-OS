@@ -1,5 +1,6 @@
 import { parse as parseCSV } from 'papaparse';
 import { fetchArchibaldNavicaListings } from './navica';
+import { fetchSiteListings } from './idxSite';
 import { setRecentListings } from './recentListings';
 import { saveListings } from '../supabase/client';
 import { safeFetch } from '../net/safeFetch';
@@ -26,6 +27,8 @@ export interface NormalizedListing {
 export interface ImportOptions {
   alerts?: Alert[];
   runMatching?: boolean;
+  /** Base URL for the 'idx-site' source; defaults to archibaldbagley.com. */
+  siteUrl?: string;
 }
 
 export interface ImportResult {
@@ -36,15 +39,46 @@ export interface ImportResult {
   lastSync?: string;
   matches?: any[];
   notifications?: any[];
+  /** MLS attribution that must be displayed with the data (e.g. "Snake River Regional MLS"). */
+  attribution?: string;
 }
 
 export async function importListings(
-  input: File | string | any[] | 'live-navica',
-  source: 'mls' | 'zillow' | 'landwatch' | 'landsofamerica' | 'navica' | 'other' = 'mls',
+  input: File | string | any[] | 'live-navica' | 'live-site',
+  source: 'mls' | 'zillow' | 'landwatch' | 'landsofamerica' | 'navica' | 'idx-site' | 'other' = 'mls',
   options?: ImportOptions
 ): Promise<ImportResult> {
   let rawData: any[] = [];
   let effectiveSource = source;
+
+  // Live pull from the brokerage's own IDX website (real MLS data without
+  // waiting on RESO credentials). See lib/import/idxSite.ts.
+  if (input === 'live-site' || source === 'idx-site') {
+    const site = await fetchSiteListings(options?.siteUrl);
+    const land = site.listings.filter(
+      l => l.propertyType.toLowerCase().includes('land') ||
+           l.propertyType.toLowerCase().includes('vacant') ||
+           (l.acres && l.acres > 0.5)
+    );
+    if (site.listings.length > 0) {
+      setRecentListings(site.listings);
+      await saveListings(site.listings);
+    }
+    const result: ImportResult = {
+      imported: site.listings.length,
+      landCount: land.length,
+      listings: site.listings,
+      source: site.source,
+      lastSync: new Date().toISOString(),
+      attribution: site.attribution,
+    };
+    if (options?.runMatching && options.alerts?.length) {
+      const r = await runAlertMatching(site.listings, options.alerts);
+      result.matches = r.matches;
+      result.notifications = r.notifications;
+    }
+    return result;
+  }
 
   // Special live Navica mode
   if (input === 'live-navica' || source === 'navica') {

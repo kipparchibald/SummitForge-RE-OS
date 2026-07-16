@@ -90,7 +90,7 @@ const SearchFilters = ({
 export default function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
-  const [source, setSource] = useState<'mls' | 'zillow' | 'landwatch' | 'navica'>('mls');
+  const [source, setSource] = useState<'mls' | 'zillow' | 'landwatch' | 'navica' | 'idx-site'>('mls');
   const [status, setStatus] = useState('');
   const [importedListings, setImportedListings] = useState<ImportedListing[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -113,6 +113,7 @@ export default function ImportPage() {
   const [aiSemanticResults, setAiSemanticResults] = useState<any>(null);
   const [useFuzzy, setUseFuzzy] = useState(true);
   const [lastSearchSource, setLastSearchSource] = useState('');
+  const [attribution, setAttribution] = useState('');
 
   // Combine sources: imported + recent + live DB results for real-time search
   // Use new fuzzy recent helper when search active
@@ -275,7 +276,27 @@ export default function ImportPage() {
     setImportedListings([]);
 
     try {
-      if (activeSource === 'navica') {
+      if (activeSource === 'idx-site') {
+        // Real MLS listings from the brokerage's own IDX site.
+        const res = await fetch('/api/import/listings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ live: 'site', source: 'idx-site' }),
+        });
+        const data = await res.json();
+        if (data.listings) {
+          setImportedListings(data.listings);
+          const ts = data.lastSync || new Date().toISOString();
+          setLastSyncTimestamp(ts);
+          setLastLiveSync(formatLastSyncTime(ts));
+          setSyncIsRecent(true);
+          if (typeof window !== 'undefined') window.dispatchEvent(new Event('navica-pull-updated'));
+          setAttribution(data.attribution || '');
+          setStatus(`✅ Imported ${data.imported} live listings from your IDX site (${data.landCount} land).`);
+        } else {
+          setStatus(data.error || 'Site import failed.');
+        }
+      } else if (activeSource === 'navica') {
         // Live Navica pull
         const res = await fetch('/api/import/listings', {
           method: 'POST',
@@ -387,6 +408,7 @@ export default function ImportPage() {
             <option value="mls">MLS CSV Export</option>
             <option value="zillow">Zillow</option>
             <option value="landwatch">LandWatch / Lands of America</option>
+            <option value="idx-site">My IDX Site — real MLS listings (Live)</option>
             <option value="navica">Navica IDX - Archibald-Bagley (Live)</option>
           </select>
         </div>
@@ -448,6 +470,9 @@ export default function ImportPage() {
             <div>
               <div className="font-semibold">Imported + Live DB + Recent Land Parcels</div>
               <div className="text-xs text-gray-500">Showing {filteredListings.length} matches (hybrid fuzzy + queryListings + recent)</div>
+              {attribution && (
+                <div className="text-[10px] text-gray-500 mt-0.5">Listing data courtesy of {attribution}. Displayed under IDX rules.</div>
+              )}
             </div>
 
             {/* Search & Filter Controls - using reusable SearchFilters component */}
