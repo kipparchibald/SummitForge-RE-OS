@@ -1,0 +1,4 @@
+# Vercel builds from source; never upload local build output or deps.
+.next
+node_modules
+.git
