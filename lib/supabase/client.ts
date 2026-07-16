@@ -3,6 +3,16 @@ import { createClient } from '@supabase/supabase-js';
 let _supabase: any = null;
 let _supabaseAdmin: any = null;
 
+/**
+ * True only when a real Supabase project URL is configured. Without this guard
+ * every read/write attempts a network call to the demo.supabase.co placeholder
+ * and burns a DNS-failure round trip on each page load.
+ */
+export function isSupabaseLive(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  return !!url && !url.includes('demo.supabase.co') && !url.includes('your-project');
+}
+
 export function getSupabase() {
   if (!_supabase) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co';
@@ -42,6 +52,7 @@ export const supabase = {
  */
 export async function saveListings(listings: any[]): Promise<{ saved: number; error?: string }> {
   if (!listings || listings.length === 0) return { saved: 0 };
+  if (!isSupabaseLive()) return { saved: 0, error: 'Supabase not configured (demo mode)' };
 
   const client = getSupabaseAdmin(); // service role for writes when available
   const now = new Date().toISOString();
@@ -95,6 +106,7 @@ export async function saveListings(listings: any[]): Promise<{ saved: number; er
  * Retrieve listings from Supabase, newest first.
  */
 export async function getListingsFromSupabase(limit = 200, filters?: any): Promise<any[]> {
+  if (!isSupabaseLive()) return [];
   const client = getSupabase();
   let query = client
     .from('listings')
@@ -130,6 +142,7 @@ export async function queryListings(
     limit?: number;
   }
 ): Promise<any[]> {
+  if (!isSupabaseLive()) return [];
   const client = getSupabase();
   let query = client.from('listings').select('*');
 

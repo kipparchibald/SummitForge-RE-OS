@@ -97,7 +97,10 @@ export default function ImportPage() {
   const [maxPrice, setMaxPrice] = useState('');
   const [locationFilter, setLocationFilter] = useState(''); // e.g. Rigby, Blackfoot
   const [autoSync, setAutoSync] = useState(false);
-  const [lastLiveSync, setLastLiveSync] = useState(() => formatLastSyncTime() || '');
+  // Start empty and hydrate from localStorage in useEffect — reading it during
+  // render makes server and client HTML disagree (hydration error).
+  const [lastLiveSync, setLastLiveSync] = useState('');
+  const [syncIsRecent, setSyncIsRecent] = useState(false);
   const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'acres-desc' | 'newest' | 'score'>('acres-desc');
 
   // Deeper live search state: DB + fuzzy + AI
@@ -231,10 +234,12 @@ export default function ImportPage() {
     // hydrate shared last sync display
     const ts = getLastSyncTimestamp();
     if (ts) setLastLiveSync(formatLastSyncTime(ts));
+    setSyncIsRecent(isLastSyncRecent());
 
     const onUpdate = () => {
       const newTs = getLastSyncTimestamp();
       setLastLiveSync(formatLastSyncTime(newTs));
+      setSyncIsRecent(isLastSyncRecent());
     };
     window.addEventListener('navica-pull-updated', onUpdate);
     return () => window.removeEventListener('navica-pull-updated', onUpdate);
@@ -257,13 +262,16 @@ export default function ImportPage() {
     }
   };
 
-  const handleImport = async () => {
+  // overrideSource: setSource() is async, so callers that switch source and
+  // import in one action (Pull Live button) must pass the source explicitly.
+  const handleImport = async (overrideSource?: string) => {
+    const activeSource = overrideSource || source;
     setIsLoading(true);
     setStatus('Importing and analyzing...');
     setImportedListings([]);
 
     try {
-      if (source === 'navica') {
+      if (activeSource === 'navica') {
         // Live Navica pull
         const res = await fetch('/api/import/listings', {
           method: 'POST',
@@ -287,7 +295,7 @@ export default function ImportPage() {
         const formData = new FormData();
         if (file) formData.append('file', file);
         if (url) formData.append('url', url);
-        formData.append('source', source);
+        formData.append('source', activeSource);
 
         try {
           const alerts = await getAlerts('user_kipp');
@@ -301,7 +309,7 @@ export default function ImportPage() {
 
         if (data.listings) setImportedListings(data.listings);
         const matchNote = data.matches?.length ? ` ${data.matches.length} alert matches generated.` : '';
-        setStatus(`✅ Imported from ${source}. ${data.imported || 0} listings.${matchNote}`);
+        setStatus(`✅ Imported from ${activeSource}. ${data.imported || 0} listings.${matchNote}`);
       }
     } catch (e) {
       setStatus('Import failed. Check console or try demo data.');
@@ -315,7 +323,7 @@ export default function ImportPage() {
 
   const pullLiveNavica = async () => {
     setSource('navica');
-    await handleImport();
+    await handleImport('navica');
     const ts = new Date().toISOString();
     setLastSyncTimestamp(ts);
     setLastLiveSync(formatLastSyncTime(ts));
@@ -394,7 +402,7 @@ export default function ImportPage() {
 
         <div className="flex gap-3">
           <button
-            onClick={handleImport}
+            onClick={() => handleImport()}
             disabled={isLoading}
             className="btn-primary flex-1 py-3 rounded-2xl font-semibold disabled:opacity-60"
           >
@@ -420,8 +428,8 @@ export default function ImportPage() {
             Auto-sync every 45s (makes it live)
           </label>
           {/* Shared live status indicator (updates on Navica pull, syncs to header) */}
-          <span className={isLastSyncRecent() ? 'text-emerald-600 font-medium' : 'text-amber-600'}>
-            Live • Last: {lastLiveSync || formatLastSyncTime() || '—'}
+          <span className={syncIsRecent ? 'text-emerald-600 font-medium' : 'text-amber-600'}>
+            Live • Last: {lastLiveSync || '—'}
           </span>
           <span className="text-gray-400">• Real-time Navica IDX data</span>
         </div>

@@ -41,6 +41,7 @@ export default function MonitoringDashboard() {
   const [recentParcels, setRecentParcels] = useState<any[]>([]);
   const [autoLoad, setAutoLoad] = useState(false);
   const [lastPull, setLastPull] = useState('');
+  const [syncIsRecent, setSyncIsRecent] = useState(false);
 
   const loadRecentNavica = async () => {
     try {
@@ -90,10 +91,12 @@ export default function MonitoringDashboard() {
   useEffect(() => {
     const ts = getLastSyncTimestamp();
     if (ts) setLastPull(formatLastSyncTime(ts));
+    setSyncIsRecent(isLastSyncRecent());
 
     const onUpdate = () => {
       const newTs = getLastSyncTimestamp();
       setLastPull(formatLastSyncTime(newTs));
+      setSyncIsRecent(isLastSyncRecent());
     };
     window.addEventListener('navica-pull-updated', onUpdate);
     return () => window.removeEventListener('navica-pull-updated', onUpdate);
@@ -123,7 +126,7 @@ export default function MonitoringDashboard() {
           <p>Track raw land opportunities in Jefferson County. Click parcels to analyze and run pro formas.</p>
         </div>
         {/* Last pulled / live status indicator (shared mechanism) */}
-        <span className={`ml-4 px-3 py-1 text-xs rounded-full border font-medium ${isLastSyncRecent() ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : lastPull ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
+        <span className={`ml-4 px-3 py-1 text-xs rounded-full border font-medium ${syncIsRecent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : lastPull ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-100 text-gray-500'}`}>
           Live • Last: {lastPull || '—'}
         </span>
       </div>

@@ -21,7 +21,7 @@ function getSupabase(): SupabaseClient | null {
   if (supabase) return supabase;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key || url.includes('your-project') || key.includes('your-anon')) {
+  if (!url || !key || url.includes('your-project') || url.includes('demo.supabase.co') || key.includes('your-anon')) {
     return null;
   }
   supabase = createClient(url, key);

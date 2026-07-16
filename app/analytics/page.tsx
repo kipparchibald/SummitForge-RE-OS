@@ -23,14 +23,17 @@ export default function AnalyticsDashboard() {
   const [forecast, setForecast] = useState<any[]>([]);
   const [sampleListings, setSampleListings] = useState<SampleListing[]>([]);
   const [lastPull, setLastPull] = useState('');
+  const [syncIsRecent, setSyncIsRecent] = useState(false);
 
   useEffect(() => {
     const ts = getLastSyncTimestamp();
     if (ts) setLastPull(formatLastSyncTime(ts));
+    setSyncIsRecent(isLastSyncRecent());
 
     const onUpdate = () => {
       const newTs = getLastSyncTimestamp();
       setLastPull(formatLastSyncTime(newTs));
+      setSyncIsRecent(isLastSyncRecent());
     };
     window.addEventListener('navica-pull-updated', onUpdate);
     return () => window.removeEventListener('navica-pull-updated', onUpdate);
@@ -91,7 +94,7 @@ export default function AnalyticsDashboard() {
         
         <div className="flex items-center gap-3 self-start">
           {/* Live status / last pulled indicator (shared across header, dashboard, import, monitoring, analytics) */}
-          <span className={`px-3 py-1 text-xs rounded-full border font-medium ${isLastSyncRecent() ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : lastPull ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+          <span className={`px-3 py-1 text-xs rounded-full border font-medium ${syncIsRecent ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : lastPull ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
             Live • Last: {lastPull || '—'}
           </span>
           <button 
