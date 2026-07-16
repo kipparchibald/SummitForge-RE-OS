@@ -216,6 +216,16 @@ function NewConstructionPanel() {
 
   const currentNC = ncData[activeTab];
 
+  // 12-month $/sqft trend per market (demo data until Navica history feed lands)
+  const trendData = {
+    combined: [265, 268, 270, 272, 274, 275, 277, 279, 280, 282, 284, 285],
+    rigby: [271, 274, 277, 279, 281, 283, 285, 288, 290, 292, 294, 295],
+    ririe: [255, 256, 258, 259, 260, 261, 262, 264, 265, 266, 267, 268],
+  }[activeTab].map((price, i) => ({
+    month: ['Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'][i],
+    price,
+  }));
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -245,7 +255,7 @@ function NewConstructionPanel() {
         <p className="text-sm text-gray-600 max-w-xl">{currentNC.insight}</p>
       </div>
       <div className="mt-6">
-        <PriceTrendChart />
+        <PriceTrendChart data={trendData} />
       </div>
     </>
   );
