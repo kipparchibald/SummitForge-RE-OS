@@ -215,6 +215,13 @@ export default function RootLayout({
                 <Link href="/ai-assistants" className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium">AI Assistants</Link>
                 <Link href="/settings/branding" className="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs">Branding</Link>
                 <a href="https://voxli.dev" target="_blank" className="text-gray-400 hover:text-gray-600 px-1">Voxli</a>
+                {!isDemo && (
+                  <form action="/auth/signout" method="post">
+                    <button type="submit" className="px-3 py-1.5 text-xs rounded-lg border text-gray-500 hover:bg-gray-50">
+                      Sign out
+                    </button>
+                  </form>
+                )}
               </div>
             </header>
 

@@ -118,6 +118,41 @@ CREATE TABLE IF NOT EXISTS transactions (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- RLS helpers (enable later when auth is live)
--- ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
--- etc.
+-- ============================================
+-- Row Level Security
+-- Baseline posture: any signed-in user at the brokerage can read/write
+-- operational data (agent-first, single-tenant stage 1). Anonymous users get
+-- nothing. Per-tenant isolation (brokerage_id = jwt claim) comes with stage 2.
+-- Server-side code using SUPABASE_SERVICE_ROLE_KEY bypasses RLS by design
+-- (cron sync, imports).
+-- ============================================
+
+ALTER TABLE brokerages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alert_matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+-- Profiles: users see all profiles (roster), but may only edit their own.
+CREATE POLICY "authenticated read profiles" ON profiles
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "own profile update" ON profiles
+  FOR UPDATE TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+
+-- Brokerages: readable by any signed-in user; managed server-side only.
+CREATE POLICY "authenticated read brokerages" ON brokerages
+  FOR SELECT TO authenticated USING (true);
+
+-- Operational tables: full access for signed-in brokerage users.
+CREATE POLICY "authenticated all alerts" ON alerts
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "authenticated all alert_matches" ON alert_matches
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "authenticated all transactions" ON transactions
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Listings: readable by signed-in users; writes come from the server-side
+-- import pipeline (service role), not the browser.
+CREATE POLICY "authenticated read listings" ON listings
+  FOR SELECT TO authenticated USING (true);
