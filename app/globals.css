@@ -104,3 +104,89 @@
     transition: width 0.3s;
   }
 }
+
+/* Report tables: uniform column gutters, flush at the outer edges. Set here
+   rather than per-cell so all four report tables stay consistent. */
+.sf-report table th,
+.sf-report table td {
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+.sf-report table th:first-child,
+.sf-report table td:first-child {
+  padding-left: 0;
+}
+.sf-report table th:last-child,
+.sf-report table td:last-child {
+  padding-right: 0;
+}
+
+/* ============================================
+   Print / PDF export (app/reports/*)
+   The browser's own print-to-PDF is the export path — real selectable text,
+   vector output, no PDF library. These rules strip screen chrome so the sheet
+   prints as a clean document.
+   ============================================ */
+
+@page {
+  size: letter portrait;
+  margin: 0.6in 0.75in;
+}
+
+@media print {
+  /* Sidebar nav, top bar, demo banner, toolbars — screen only. */
+  aside,
+  header.border-b,
+  .demo-banner,
+  .sf-no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  /* Keep the report's ink: browsers drop backgrounds/colors by default. */
+  .sf-report,
+  .sf-report * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sf-sheet {
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .sf-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Don't strand a heading or split a table row across pages. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  section {
+    break-inside: avoid-page;
+  }
+}

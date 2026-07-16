@@ -4,6 +4,8 @@
 // ISPWC-based infrastructure costs, and a maximum-offer / Offer-Pass verdict.
 // Pure functions (no deps) so it runs in scans, API routes, and the client.
 
+import { mapCityToLocation, countyForLocation } from '@/lib/geo/counties';
+
 export interface CountyPreset {
   key: string; label: string;
   lotAcres: number; roadFactor: number; frontageFtPerLot: number;
@@ -20,17 +22,14 @@ export const COUNTY_PRESETS: Record<string, CountyPreset> = {
   Madison:      { key: 'Madison',      label: 'Madison Co. R-1 (~0.33 ac)',       lotAcres: 0.33, roadFactor: 0.19, frontageFtPerLot: 100, urban: true,  lotPrice: 100000, absorption: 4, rowFt: 60, pavementFt: 32 },
   Bingham:      { key: 'Bingham',      label: 'Bingham Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 100000, absorption: 2, rowFt: 60, pavementFt: 30 },
   Fremont:      { key: 'Fremont',      label: 'Fremont Co. R-1 (~1 ac)',          lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 95000,  absorption: 2, rowFt: 60, pavementFt: 30 },
+  // Bannock: Pocatello/Chubbuck are the region's second urban core — city lot
+  // sizes and absorption closer to Bonneville, but softer finished-lot pricing.
+  Bannock:      { key: 'Bannock',      label: 'Bannock Co. R-1 (~0.28 ac)',       lotAcres: 0.28, roadFactor: 0.19, frontageFtPerLot: 95,  urban: true,  lotPrice: 92000,  absorption: 3, rowFt: 60, pavementFt: 32 },
+  // Teton: resort market (Driggs/Victor/Tetonia). Finished lots clear far above
+  // the rest of the region and absorb slowly — using a Default preset here would
+  // badly understate both lot value and carry time.
+  Teton:        { key: 'Teton',        label: 'Teton Co. R-1 (~1 ac resort)',     lotAcres: 1.0,  roadFactor: 0.15, frontageFtPerLot: 156, urban: false, lotPrice: 215000, absorption: 1.5, rowFt: 60, pavementFt: 28 },
   Default:      { key: 'Default',      label: 'Generic R-1 (1 ac)',               lotAcres: 1.0,  roadFactor: 0.14, frontageFtPerLot: 156, urban: false, lotPrice: 110000, absorption: 3, rowFt: 60, pavementFt: 30 },
-};
-
-// Eastern-Idaho city -> county (unincorporated default). Extend as needed.
-const CITY_COUNTY: Record<string, string> = {
-  rigby: 'Jefferson', menan: 'Jefferson', ririe: 'Jefferson', lewisville: 'Jefferson',
-  roberts: 'Jefferson', terreton: 'Jefferson', hamer: 'Jefferson', 'mud lake': 'Jefferson',
-  'idaho falls': 'Bonneville', ammon: 'Bonneville', iona: 'Bonneville', ucon: 'Bonneville', 'swan valley': 'Bonneville',
-  shelley: 'Bingham', blackfoot: 'Bingham', firth: 'Bingham', basalt: 'Bingham',
-  rexburg: 'Madison', 'sugar city': 'Madison',
-  'st. anthony': 'Fremont', 'saint anthony': 'Fremont', 'st anthony': 'Fremont', ashton: 'Fremont',
 };
 
 export function inferCounty(cityOrAddress?: string, explicitCounty?: string): string {
@@ -38,9 +37,10 @@ export function inferCounty(cityOrAddress?: string, explicitCounty?: string): st
     const k = Object.keys(COUNTY_PRESETS).find(k => explicitCounty.toLowerCase().startsWith(k.toLowerCase()));
     if (k) return k;
   }
-  const s = (cityOrAddress || '').toLowerCase();
-  for (const city of Object.keys(CITY_COUNTY)) if (s.includes(city)) return CITY_COUNTY[city];
-  return 'Default';
+  // Derives from the canonical geography registry rather than a private city
+  // map, so a market added in lib/geo/counties.ts is priced correctly here too.
+  const county = countyForLocation(mapCityToLocation(cityOrAddress || ''));
+  return county && COUNTY_PRESETS[county] ? county : 'Default';
 }
 
 export function presetFor(county: string): CountyPreset {

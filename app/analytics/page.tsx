@@ -10,6 +10,8 @@ import { fuzzyFilterListings } from '../../lib/import/listings';
 import { setLastSyncTimestamp, getLastSyncTimestamp, formatLastSyncTime, isLastSyncRecent } from '../../lib/import/recentListings';
 import { isDemoMode } from '@/lib/env';
 import { COVERAGE_COUNTIES_LABEL } from '@/lib/geo/counties';
+import { landValuesRanked } from '@/lib/analysis/land-values';
+import Link from 'next/link';
 
 interface SampleListing {
   address: string;
@@ -17,25 +19,7 @@ interface SampleListing {
   acres?: number;
 }
 
-// Representative land values across the seven covered counties. These are demo
-// figures for the preview experience — once the Navica feed is live these get
-// derived from imported comps rather than hardcoded.
-const LAND_VALUE_BY_MARKET: {
-  market: string;
-  county: string;
-  perAcre: number;
-  rising?: boolean;
-}[] = [
-  { market: 'Driggs', county: 'Teton', perAcre: 62500, rising: true },
-  { market: 'Rexburg', county: 'Madison', perAcre: 38900, rising: true },
-  { market: 'Idaho Falls', county: 'Bonneville', perAcre: 34200, rising: true },
-  { market: 'Rigby', county: 'Jefferson', perAcre: 27800, rising: true },
-  { market: 'Pocatello', county: 'Bannock', perAcre: 24100 },
-  { market: 'Roberts', county: 'Jefferson', perAcre: 21600, rising: true },
-  { market: 'Blackfoot', county: 'Bingham', perAcre: 19300 },
-  { market: 'St. Anthony', county: 'Fremont', perAcre: 17500 },
-  { market: 'Terreton', county: 'Jefferson', perAcre: 14200 },
-];
+
 
 export default function AnalyticsDashboard() {
   const [lastImport, setLastImport] = useState('2026-06-15');
@@ -173,7 +157,7 @@ export default function AnalyticsDashboard() {
             Representative $/acre by market{isDemoMode() ? ' — demo values until the live feed is connected' : ''}
           </p>
           <div className="space-y-2.5 text-sm">
-            {LAND_VALUE_BY_MARKET.map(({ market, county, perAcre, rising }) => (
+            {landValuesRanked().slice(0, 6).map(({ market, county, perAcre, yoyPct }) => (
               <div key={market} className="flex items-baseline justify-between gap-2">
                 <span>
                   {market}
@@ -181,14 +165,17 @@ export default function AnalyticsDashboard() {
                 </span>
                 <span>
                   <span className="font-medium">${perAcre.toLocaleString()}/acre</span>
-                  {rising && <span className="text-green-600 ml-1">↑</span>}
+                  {yoyPct != null && <span className="text-green-600 ml-1">↑</span>}
                 </span>
               </div>
             ))}
           </div>
-          <button className="mt-6 w-full border border-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
-            View Full Land Analysis
-          </button>
+          <Link
+            href="/reports/land-analysis"
+            className="mt-6 block w-full border border-gray-300 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 text-center"
+          >
+            View Full Land Analysis →
+          </Link>
         </div>
 
         {/* New Construction - Rigby & Ririe */}
