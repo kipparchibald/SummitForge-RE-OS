@@ -1,16 +1,9 @@
 {
   "framework": "nextjs",
-  "regions": ["iad1"],
+  "regions": ["sfo1"],
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "env": {
-    "NEXT_PUBLIC_MAPBOX_TOKEN": "@mapbox-token",
-    "OPENAI_API_KEY": "@openai-key",
-    "NEXT_PUBLIC_SUPABASE_URL": "@supabase-url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon",
-    "NEXT_PUBLIC_DEMO_MODE": "false"
-  },
   "headers": [
     {
       "source": "/(.*)",
