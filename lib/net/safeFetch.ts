@@ -43,12 +43,32 @@ export function assertPublicUrl(rawUrl: string): URL {
   return url;
 }
 
+const MAX_REDIRECTS = 5;
+
 /**
  * fetch() that first validates the URL is public. Note: this checks the literal
  * hostname, not post-DNS resolution, so it does not defend against DNS-rebinding
  * — sufficient for blocking the obvious metadata/localhost/private-range targets.
+ *
+ * Redirects are followed manually and every hop is re-validated. Handing
+ * `redirect: 'follow'` to fetch would let a public URL bounce the request to an
+ * internal address with no further checks; refusing redirects outright (the
+ * previous behaviour) instead broke ordinary sites, since most apex domains
+ * 301 to www. Following hop-by-hop keeps the guard on each destination.
  */
 export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Response> {
-  const url = assertPublicUrl(rawUrl);
-  return fetch(url.toString(), { ...init, redirect: 'error' });
+  let url = assertPublicUrl(rawUrl);
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await fetch(url.toString(), { ...init, redirect: 'manual' });
+
+    const isRedirect = res.status >= 300 && res.status < 400 && res.headers.has('location');
+    if (!isRedirect) return res;
+
+    const location = res.headers.get('location')!;
+    // Relative Locations resolve against the current hop.
+    url = assertPublicUrl(new URL(location, url).toString());
+  }
+
+  throw new Error(`Too many redirects (>${MAX_REDIRECTS})`);
 }

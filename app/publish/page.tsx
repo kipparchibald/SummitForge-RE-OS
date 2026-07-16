@@ -34,6 +34,7 @@ export default function PublishPage() {
   const [selected, setSelected] = useState(TENANTS[0]);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+  const [tenantConfig, setTenantConfig] = useState<any>(null);
   const [features, setFeatures] = useState({
     alerts: true,
     transactions: true,
@@ -46,11 +47,44 @@ export default function PublishPage() {
     voice: true,
   });
 
+  // Builds the tenant configuration package. It does NOT deploy: provisioning a
+  // project and pointing a domain are account-level actions that happen in Vercel
+  // and DNS. Claiming "live at <domain>" here is how this shipped a URL that was
+  // never reachable.
   const publish = async () => {
     setPublishing(true);
-    await new Promise((r) => setTimeout(r, 1800));
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('summitforge_branding') : null;
+    const brand = saved ? JSON.parse(saved) : null;
+    const config = {
+      tenant: selected.id,
+      companyName: brand?.companyName || selected.name,
+      domain: selected.domain,
+      branding: brand
+        ? {
+            logo: brand.logo,
+            primaryColor: brand.primaryColor,
+            secondaryColor: brand.secondaryColor,
+            accentColor: brand.accentColor,
+            tagline: brand.tagline,
+            phone: brand.phone,
+          }
+        : null,
+      modules: Object.entries(features).filter(([, on]) => on).map(([k]) => k),
+      generatedAt: new Date().toISOString(),
+    };
+    setTenantConfig(config);
     setPublishing(false);
     setPublished(true);
+  };
+
+  const downloadConfig = () => {
+    if (!tenantConfig) return;
+    const blob = new Blob([JSON.stringify(tenantConfig, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `summitforge-tenant-${tenantConfig.tenant}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -161,23 +195,32 @@ export default function PublishPage() {
             disabled={publishing}
             className="px-8 py-4 bg-black text-white font-medium rounded-2xl hover:bg-gray-800 disabled:opacity-50 transition text-lg"
           >
-            {publishing ? 'Packaging & deploying…' : 'Publish white-label product'}
+            {publishing ? 'Building package…' : 'Build white-label package'}
           </button>
           {published && (
-            <div className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 text-sm">
-              <strong>Published</strong> — {selected.name} is live at{' '}
-              <span className="font-mono">{selected.domain}</span>
-              <br />
-              <span className="text-emerald-600 text-xs">
-                Marketing site + login + module config generated. Share the link with your client brokerage.
-              </span>
+            <div className="text-gray-800 bg-white border rounded-2xl px-5 py-4 text-sm max-w-xl">
+              <strong>Package built</strong> for {tenantConfig?.companyName || selected.name}
+              {tenantConfig?.branding ? ' with your imported branding.' : ' (no saved branding — import it first).'}
+              <button onClick={downloadConfig} className="ml-2 underline text-blue-700">
+                Download config
+              </button>
+              <div className="mt-3 text-xs text-gray-600">
+                <div className="font-semibold text-gray-700 mb-1">
+                  Not deployed yet. To make <span className="font-mono">{selected.domain}</span> reachable:
+                </div>
+                <ol className="list-decimal ml-4 space-y-0.5">
+                  <li>Add <span className="font-mono">{selected.domain}</span> as a domain on the Vercel project</li>
+                  <li>Add the matching CNAME at the domain&apos;s registrar</li>
+                  <li>Set the tenant&apos;s branding + env vars, then redeploy</li>
+                </ol>
+              </div>
             </div>
           )}
         </section>
 
         <p className="text-xs text-gray-400">
-          This simulates multi-tenant deploy. Production would provision a Vercel project,
-          inject brand tokens, and create a Supabase tenant row.
+          Multi-tenant provisioning (Vercel project + Supabase tenant row per brokerage) is not
+          automated yet — this builds the configuration those steps consume.
         </p>
       </div>
     </div>

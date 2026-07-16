@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { isDemoMode } from '@/lib/env';
 
 export default function BrandingSettings() {
+  const [importStatus, setImportStatus] = useState('');
   const [branding, setBranding] = useState({
     logo: '',
     primaryColor: '#1e40af',
@@ -77,29 +78,47 @@ export default function BrandingSettings() {
     }
   };
 
-  // Fully automated live sync from archibaldbagley.com (calls server API)
+  // Imports real branding from a brokerage's public site. Fields the parser
+  // cannot read off the page are reported, not invented — a silent fallback to
+  // canned values is what made this look like it worked when it hadn't.
   const importFromSite = async () => {
+    const site = (branding.customDomain || 'archibaldbagley.com').trim();
+    const url = /^https?:\/\//i.test(site) ? site : `https://${site}`;
+    setImportStatus('Reading ' + site + '…');
     try {
-      const res = await fetch('/api/branding/sync');
+      const res = await fetch(`/api/branding/sync?url=${encodeURIComponent(url)}`);
       const data = await res.json();
-      if (data.branding) {
-        const next = { ...branding, ...data.branding };
-        setBranding(next);
-        applyTheme(next);
-        alert(`✅ Automated sync complete from archibaldbagley.com (${data.source}). ${data.branding.logo ? 'Logo detected.' : 'Logo not auto-detected — upload it.'} Non-data content (about, contact) imported. Save to persist.`);
+
+      if (!data.success || !data.branding) {
+        setImportStatus(`Could not import from ${site}: ${data.error || 'unreachable'}. Enter branding manually below.`);
+        return;
       }
-    } catch (e) {
-      alert('Live sync unavailable — using reliable Archibald-Bagley defaults.');
-      const fallback = {
-        ...branding,
-        companyName: 'Archibald-Bagley Real Estate',
-        tagline: 'Your Eastern Idaho Realtors',
-        phone: '(208) 745-5911',
-        facebook: 'https://www.facebook.com/archibaldbagleyrealestate',
-        aboutBlurb: 'Archibald-Bagley Real Estate has built a reputation for integrity, professionalism, and a deep understanding of the local market. With over two decades of experience, we specialize in Land & Acreage across Rigby, Idaho Falls, and Eastern Idaho.',
-      };
-      setBranding(fallback);
-      applyTheme(fallback);
+
+      // Only overwrite fields that were actually found.
+      const incoming = data.branding;
+      const next: any = { ...branding };
+      for (const key of data.found || []) {
+        if (key === 'colors') {
+          next.primaryColor = incoming.primaryColor || branding.primaryColor;
+          next.secondaryColor = incoming.secondaryColor || branding.secondaryColor;
+          next.accentColor = incoming.accentColor || branding.accentColor;
+        } else if (incoming[key]) {
+          next[key] = incoming[key];
+        }
+      }
+      next.customDomain = incoming.customDomain || branding.customDomain;
+
+      setBranding(next);
+      applyTheme(next);
+
+      const missing = data.missing || [];
+      setImportStatus(
+        `Imported ${(data.found || []).join(', ')} from ${site}.` +
+          (missing.length ? ` Not found: ${missing.join(', ')} — set these manually.` : '') +
+          ' Save to persist.'
+      );
+    } catch (e: any) {
+      setImportStatus(`Import failed: ${e?.message || 'network error'}. Enter branding manually below.`);
     }
   };
 
@@ -167,12 +186,19 @@ export default function BrandingSettings() {
             />
           </div>
 
-          <button 
+          <button
             onClick={importFromSite}
             className="w-full py-2 rounded-xl border border-blue-600 text-blue-600 hover:bg-blue-50 font-medium text-sm"
           >
-            📥 Import Official Branding + Info from archibaldbagley.com
+            📥 Import branding from {branding.customDomain || 'the brokerage site'}
           </button>
+          <p className="text-[11px] text-gray-500 -mt-1">
+            Reads the site&apos;s real logo, colors, and contact details. Set the domain field above
+            to import a different brokerage.
+          </p>
+          {importStatus && (
+            <p className="text-xs bg-gray-50 border rounded-lg px-3 py-2 text-gray-700">{importStatus}</p>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
