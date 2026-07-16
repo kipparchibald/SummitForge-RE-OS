@@ -30,25 +30,43 @@ export async function GET(request: NextRequest) {
     const result = await fetchArchibaldNavicaListings(100);
 
     // Explicitly call save + recent update as requested (idempotent with what fetch already does internally)
+    let saved = 0;
+    let persistError: string | undefined;
     if (result.listings && result.listings.length > 0) {
-      await saveListings(result.listings);
+      const saveResult = await saveListings(result.listings);
+      saved = saveResult.saved;
+      persistError = saveResult.error;
       setRecentListings(result.listings);
     }
 
+    // A sync that fetched listings but persisted none is a failure, not a
+    // success — reporting 200/success here would hide a broken service-role key
+    // or RLS policy behind a green check forever.
+    const persisted = saved > 0 || result.landCount === 0;
+
     const payload = {
-      success: true,
-      message: 'Navica sync completed',
+      success: persisted,
+      message: persisted
+        ? 'Navica sync completed'
+        : 'Navica sync fetched listings but persisted none — check SUPABASE_SERVICE_ROLE_KEY and RLS policies',
       count: result.count,
       landCount: result.landCount,
+      saved,
+      ...(persistError ? { persistError } : {}),
       source: result.source,
       lastSync: result.lastSync,
       demo: result.source.toLowerCase().includes('demo'),
       listingsSample: result.listings.slice(0, 3).map(l => ({ address: l.address, acres: l.acres, price: l.price })),
     };
 
-    console.log('[Cron Navica] Sync result:', { landCount: result.landCount, source: result.source });
+    console.log('[Cron Navica] Sync result:', {
+      landCount: result.landCount,
+      saved,
+      persistError,
+      source: result.source,
+    });
 
-    return NextResponse.json(payload);
+    return NextResponse.json(payload, { status: persisted ? 200 : 500 });
   } catch (error: any) {
     console.error('[Cron Navica] Sync failed:', error);
     return NextResponse.json(
