@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { isDemoMode } from '@/lib/env';
 
 let _supabase: any = null;
 let _supabaseAdmin: any = null;
@@ -73,6 +74,7 @@ export async function saveListings(listings: any[]): Promise<{ saved: number; er
         description: l.description || null,
         url: l.url || null,
         source: l.source || 'unknown',
+        visibility: l.visibility || 'public',
         last_synced: now,
         geometry: l.geometry || null,
         raw_data: l.rawData || l,
@@ -114,6 +116,9 @@ export async function getListingsFromSupabase(limit = 200, filters?: any): Promi
     .order('last_synced', { ascending: false })
     .limit(Math.min(limit, 500));
 
+  // Public (no-login) deployments must never surface BBO records.
+  if (isDemoMode()) query = query.eq('visibility', 'public');
+
   if (filters?.source) query = query.eq('source', filters.source);
   if (filters?.minPrice != null) query = query.gte('price', filters.minPrice);
   if (filters?.maxPrice != null) query = query.lte('price', filters.maxPrice);
@@ -145,6 +150,7 @@ export async function queryListings(
   if (!isSupabaseLive()) return [];
   const client = getSupabase();
   let query = client.from('listings').select('*');
+  if (isDemoMode()) query = query.eq('visibility', 'public');
 
   if (searchTerm && searchTerm.trim().length > 0) {
     const term = searchTerm.trim();

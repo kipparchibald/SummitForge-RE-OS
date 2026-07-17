@@ -77,6 +77,9 @@ CREATE TABLE IF NOT EXISTS listings (
   description TEXT,
   url TEXT,
   source TEXT,
+  -- 'public' (IDX-displayable) or 'internal' (BBO / back-office only).
+  -- See lib/import/feedTypes.ts; public surfaces filter on this.
+  visibility TEXT NOT NULL DEFAULT 'public',
   last_synced TIMESTAMPTZ DEFAULT NOW(),
   geometry JSONB,           -- Store GeoJSON object {type: 'Point', coordinates: [...] } or full geometry. Use GEOMETRY column for PostGIS spatial if preferred.
   raw_data JSONB,

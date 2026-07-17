@@ -7,11 +7,14 @@ import { safeFetch } from '../net/safeFetch';
 import { findMatchesForListing } from '@/lib/alerts/matching';
 import { processMatchesForNotification } from '@/lib/alerts/notifications';
 import { mapCityToLocation } from '@/lib/geo/counties';
+import type { FeedVisibility } from './feedTypes';
 import type { Alert, Listing as AlertListing } from '@/types/alerts';
 
 export interface NormalizedListing {
   source: string;
   externalId?: string;
+  /** Public-display permission per the data license. Absent = public (legacy sources). */
+  visibility?: FeedVisibility;
   address: string;
   city?: string;
   price: number;

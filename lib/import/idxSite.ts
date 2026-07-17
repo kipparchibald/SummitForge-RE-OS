@@ -102,6 +102,8 @@ export function parseDetailPage(html: string, url: string): NormalizedListing | 
 
   return {
     source: 'idx-site',
+    // Read off the brokerage's own public website, so public by construction.
+    visibility: 'public',
     externalId: mls,
     address: node.name || [street, city, addr.addressRegion].filter(Boolean).join(', '),
     city,

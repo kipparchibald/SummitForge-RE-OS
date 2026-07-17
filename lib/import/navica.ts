@@ -4,6 +4,8 @@
 // Falls back gracefully to realistic demo data for Eastern Idaho raw land.
 
 import { NormalizedListing } from './listings';
+import { feedVisibility } from './feedTypes';
+import { isDemoMode } from '@/lib/env';
 import { setRecentListings } from './recentListings';
 import { saveListings } from '../supabase/client';
 
@@ -268,6 +270,10 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
 
     const data = await res.json();
 
+    // Public deployments (NEXT_PUBLIC_DEMO_MODE=true → no login) may only ever
+    // receive IDX-permitted records. Auth-gated deployments keep BBO data —
+    // that's the licensed audience (brokerage staff).
+
     // Handle common shapes:
     // 1. RESO Web API: { value: [...] }
     // 2. Simple array: [...]
@@ -279,9 +285,19 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
     else if (data.data && Array.isArray(data.data)) rawListings = data.data;
     else rawListings = [data]; // single object fallback
 
-    const normalized = rawListings
+    let normalized = rawListings
       .map(row => normalizeNavicaRow(row, 'navica-live'))
       .filter(Boolean) as NormalizedListing[];
+
+    // Enforce the FeedTypes license boundary at ingestion for public
+    // deployments: with NEXT_PUBLIC_DEMO_MODE=true there is no login, so
+    // BBO/internal records must not exist in this process's output at all.
+    if (isDemoMode()) {
+      const before = normalized.length;
+      normalized = normalized.filter(l => l.visibility !== 'internal');
+      const dropped = before - normalized.length;
+      if (dropped > 0) console.log(`[Navica] Public deployment: withheld ${dropped} non-IDX (BBO) records`);
+    }
 
     let landListings = normalized.filter(l =>
       (l.propertyType.toLowerCase().includes('land') ||
@@ -390,6 +406,9 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
 
     return {
       source,
+      // BBO records in the combined Navica feed must never reach public
+      // surfaces; visibility is decided once here (fail-closed in feedTypes).
+      visibility: feedVisibility(row),
       externalId: String(mlsId || ''),
       address: fullAddress,
       price,
