@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchArchibaldNavicaListings } from '@/lib/import/navica';
+import { fetchArchibaldNavicaListings, backfillNavicaListings } from '@/lib/import/navica';
 import { saveListings } from '@/lib/supabase/client';
 import { setRecentListings } from '@/lib/import/recentListings';
 import { authorizeCron } from '@/lib/auth/cron';
 
 export const dynamic = 'force-dynamic';
+// Room for the paginated overnight backfill; hourly syncs finish in seconds.
+export const maxDuration = 300;
 
 /**
  * Vercel Cron endpoint for background Navica/Archibald-Bagley IDX sync.
@@ -21,6 +23,18 @@ export async function GET(request: NextRequest) {
   // Fail-closed in production; open only in demo mode. See lib/auth/cron.ts.
   if (!authorizeCron(request).ok) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // One-off paginated full load for when the live feed first goes live.
+  // Run OVERNIGHT (SRMLS restricts daytime bulk volume):
+  //   GET /api/cron/sync-navica?backfill=1  (with the usual CRON_SECRET bearer)
+  // If the response carries nextSkip, call again with ?skip=<nextSkip> to
+  // continue (each run is sized to fit inside maxDuration).
+  if (request.nextUrl.searchParams.get('backfill')) {
+    const skipParam = parseInt(request.nextUrl.searchParams.get('skip') || '0', 10);
+    const result = await backfillNavicaListings({ startSkip: Number.isFinite(skipParam) ? skipParam : 0 });
+    console.log('[Cron Navica] Backfill result:', result);
+    return NextResponse.json(result, { status: result.success ? 200 : 500 });
   }
 
   try {

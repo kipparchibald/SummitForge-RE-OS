@@ -5,6 +5,7 @@
 
 import { NormalizedListing } from './listings';
 import { feedVisibility } from './feedTypes';
+import { mapCityToLocation } from '@/lib/geo/counties';
 import { isDemoMode } from '@/lib/env';
 import { setRecentListings } from './recentListings';
 import { saveListings } from '../supabase/client';
@@ -241,25 +242,11 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
   }
 
   try {
-    const headers: HeadersInit = {
-      'Accept': 'application/json',
-      'User-Agent': 'SummitForge-RE-OS/1.0 (Archibald-Bagley internal)',
-    };
-
-    if (NAVICA_KEY) {
-      // Common auth patterns
-      if (NAVICA_KEY.startsWith('Bearer ') || NAVICA_KEY.length > 40) {
-        headers['Authorization'] = NAVICA_KEY.startsWith('Bearer ') ? NAVICA_KEY : `Bearer ${NAVICA_KEY}`;
-      } else {
-        headers['X-API-Key'] = NAVICA_KEY;
-      }
-    }
-
     const url = NAVICA_URL.includes('?') ? `${NAVICA_URL}&$top=${limit}` : `${NAVICA_URL}?$top=${limit}`;
 
     const res = await fetch(url, {
       method: 'GET',
-      headers,
+      headers: buildNavicaHeaders(),
       // For RETS/older feeds you may need different handling or a library
       next: { revalidate: 300 }, // 5 min cache in Next
     });
@@ -269,46 +256,10 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
     }
 
     const data = await res.json();
+    const rawListings = extractRows(data);
+    const normalized = normalizeAndGate(rawListings);
 
-    // Public deployments (NEXT_PUBLIC_DEMO_MODE=true → no login) may only ever
-    // receive IDX-permitted records. Auth-gated deployments keep BBO data —
-    // that's the licensed audience (brokerage staff).
-
-    // Handle common shapes:
-    // 1. RESO Web API: { value: [...] }
-    // 2. Simple array: [...]
-    // 3. { listings: [...] } or { data: [...] }
-    let rawListings: any[] = [];
-    if (Array.isArray(data)) rawListings = data;
-    else if (data.value && Array.isArray(data.value)) rawListings = data.value;
-    else if (data.listings && Array.isArray(data.listings)) rawListings = data.listings;
-    else if (data.data && Array.isArray(data.data)) rawListings = data.data;
-    else rawListings = [data]; // single object fallback
-
-    let normalized = rawListings
-      .map(row => normalizeNavicaRow(row, 'navica-live'))
-      .filter(Boolean) as NormalizedListing[];
-
-    // Enforce the FeedTypes license boundary at ingestion for public
-    // deployments: with NEXT_PUBLIC_DEMO_MODE=true there is no login, so
-    // BBO/internal records must not exist in this process's output at all.
-    if (isDemoMode()) {
-      const before = normalized.length;
-      normalized = normalized.filter(l => l.visibility !== 'internal');
-      const dropped = before - normalized.length;
-      if (dropped > 0) console.log(`[Navica] Public deployment: withheld ${dropped} non-IDX (BBO) records`);
-    }
-
-    let landListings = normalized.filter(l =>
-      (l.propertyType.toLowerCase().includes('land') ||
-       l.propertyType.toLowerCase().includes('vacant') ||
-       (l.acres && l.acres > 0.5)) &&
-      (l.address.toLowerCase().includes('rigby') ||
-       l.address.toLowerCase().includes('terreton') ||
-       l.address.toLowerCase().includes('blackfoot') ||
-       l.address.toLowerCase().includes('shelley') ||
-       l.address.toLowerCase().includes('jefferson'))
-    );
+    let landListings = normalized.filter(isCoveredLand);
 
     // Automate filters for live search
     if (filters) {
@@ -349,6 +300,177 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
       source: 'demo (live fetch failed - using fallback)',
       lastSync,
       error: error.message,
+    };
+  }
+}
+
+function buildNavicaHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'User-Agent': 'SummitForge-RE-OS/1.0 (Archibald-Bagley internal)',
+  };
+  if (NAVICA_KEY) {
+    // Common auth patterns
+    if (NAVICA_KEY.startsWith('Bearer ') || NAVICA_KEY.length > 40) {
+      headers['Authorization'] = NAVICA_KEY.startsWith('Bearer ') ? NAVICA_KEY : `Bearer ${NAVICA_KEY}`;
+    } else {
+      headers['X-API-Key'] = NAVICA_KEY;
+    }
+  }
+  return headers;
+}
+
+// Handle common response shapes:
+// 1. RESO Web API: { value: [...] }
+// 2. Simple array: [...]
+// 3. { listings: [...] } or { data: [...] }
+function extractRows(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data?.value && Array.isArray(data.value)) return data.value;
+  if (data?.listings && Array.isArray(data.listings)) return data.listings;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  return [data]; // single object fallback
+}
+
+// Normalize raw rows and enforce the FeedTypes license boundary at ingestion
+// for public deployments: with NEXT_PUBLIC_DEMO_MODE=true there is no login,
+// so BBO/internal records must not exist in this process's output at all.
+// Auth-gated deployments keep BBO data — that's the licensed audience
+// (brokerage staff).
+function normalizeAndGate(rawListings: any[]): NormalizedListing[] {
+  let normalized = rawListings
+    .map(row => normalizeNavicaRow(row, 'navica-live'))
+    .filter(Boolean) as NormalizedListing[];
+
+  if (isDemoMode()) {
+    const before = normalized.length;
+    normalized = normalized.filter(l => l.visibility !== 'internal');
+    const dropped = before - normalized.length;
+    if (dropped > 0) console.log(`[Navica] Public deployment: withheld ${dropped} non-IDX (BBO) records`);
+  }
+  return normalized;
+}
+
+// Coverage comes from lib/geo/counties.ts (all 7 counties), not a hardcoded
+// city list — the feed's own $filter is the primary boundary.
+function isCoveredLand(l: NormalizedListing): boolean {
+  return (
+    (l.propertyType.toLowerCase().includes('land') ||
+      l.propertyType.toLowerCase().includes('vacant') ||
+      Boolean(l.acres && l.acres > 0.5)) &&
+    mapCityToLocation(l.address) !== 'Other'
+  );
+}
+
+export interface NavicaBackfillResult {
+  success: boolean;
+  pages: number;
+  fetched: number;
+  landCount: number;
+  saved: number;
+  /** Set when the run stopped at maxPages — pass back as `skip` to resume. */
+  nextSkip?: number;
+  source: string;
+  lastSync: string;
+  error?: string;
+}
+
+/**
+ * Paginated full backfill of the Navica feed, for the initial overnight load
+ * (the SRMLS agreement restricts daytime bulk volume — run this after hours).
+ *
+ * Walks the feed with RESO OData paging ($top/$skip), following
+ * @odata.nextLink when the server provides one. Each page is normalized,
+ * FeedTypes-gated, filtered to covered land, and upserted before the next
+ * page is requested, so an interrupted run keeps everything fetched so far.
+ */
+export async function backfillNavicaListings(opts?: {
+  pageSize?: number;
+  maxPages?: number;
+  delayMs?: number;
+  landOnly?: boolean;
+  /** Resume point from a previous run's nextSkip. */
+  startSkip?: number;
+}): Promise<NavicaBackfillResult> {
+  const pageSize = opts?.pageSize ?? 200;
+  // Sized so a full run fits inside the route's maxDuration; resume with
+  // nextSkip if the feed is bigger than pageSize * maxPages.
+  const maxPages = opts?.maxPages ?? 40;
+  const delayMs = opts?.delayMs ?? 1000;
+  const landOnly = opts?.landOnly ?? true;
+  const startSkip = opts?.startSkip ?? 0;
+  const lastSync = new Date().toISOString();
+
+  if (!NAVICA_URL || !NAVICA_KEY) {
+    return {
+      success: false, pages: 0, fetched: 0, landCount: 0, saved: 0,
+      source: 'none', lastSync,
+      error: 'NAVICA_IDX_URL / NAVICA_API_KEY not configured — backfill only runs against the live feed',
+    };
+  }
+
+  const headers = buildNavicaHeaders();
+  let pages = 0;
+  let fetched = 0;
+  let landCount = 0;
+  let saved = 0;
+
+  try {
+    const sep = NAVICA_URL.includes('?') ? '&' : '?';
+    let skip = startSkip;
+    let nextUrl: string | null = `${NAVICA_URL}${sep}$top=${pageSize}&$skip=${skip}`;
+
+    while (nextUrl && pages < maxPages) {
+      const res: Response = await fetch(nextUrl, { method: 'GET', headers, cache: 'no-store' });
+      if (!res.ok) throw new Error(`Navica feed responded ${res.status} on page ${pages + 1}`);
+
+      const data = await res.json();
+      const rows = extractRows(data);
+      pages += 1;
+      fetched += rows.length;
+
+      const normalized = normalizeAndGate(rows);
+      const batch = landOnly ? normalized.filter(isCoveredLand) : normalized;
+      landCount += batch.length;
+
+      if (batch.length > 0) {
+        const saveResult = await saveListings(batch);
+        saved += saveResult.saved;
+        if (saveResult.error) {
+          throw new Error(`Persist failed on page ${pages}: ${saveResult.error}`);
+        }
+      }
+
+      console.log(`[Navica backfill] page ${pages}: ${rows.length} fetched, ${batch.length} kept, ${saved} saved total`);
+
+      // Server-driven paging wins when offered; otherwise advance $skip until
+      // a short page signals the end.
+      const nextLink = data?.['@odata.nextLink'] || data?.['odata.nextLink'] || null;
+      skip += rows.length; // keep the resume point honest under both paging styles
+      if (nextLink) {
+        nextUrl = String(nextLink);
+      } else if (rows.length === pageSize) {
+        nextUrl = `${NAVICA_URL}${sep}$top=${pageSize}&$skip=${skip}`;
+      } else {
+        nextUrl = null;
+      }
+
+      if (nextUrl && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+
+    const exhausted = nextUrl === null;
+    return {
+      success: true, pages, fetched, landCount, saved,
+      ...(exhausted ? {} : { nextSkip: skip }),
+      source: 'live (Navica backfill)', lastSync,
+    };
+  } catch (error: any) {
+    console.error('[Navica backfill] failed:', error.message);
+    return {
+      success: false, pages, fetched, landCount, saved,
+      source: 'live (Navica backfill)', lastSync, error: error.message,
     };
   }
 }
