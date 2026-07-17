@@ -57,6 +57,15 @@ export async function importListings(
   // Live pull from the brokerage's own IDX website (real MLS data without
   // waiting on RESO credentials). See lib/import/idxSite.ts.
   if (input === 'live-site' || source === 'idx-site') {
+    // NAVICA API Terms §8(e) prohibit scraper-gathered copies of information
+    // "similar to or the same as" the feed Data. The site importer was the
+    // stopgap for the credential wait — once the real feed is configured it
+    // retires itself so it cannot be used alongside the licensed feed.
+    if (process.env.NAVICA_IDX_URL && process.env.NAVICA_API_KEY) {
+      throw new Error(
+        'Site import is disabled: the licensed Navica feed is configured. Use the Navica source instead (NAVICA API Terms §8e).'
+      );
+    }
     const site = await fetchSiteListings(options?.siteUrl);
     const land = site.listings.filter(
       l => l.propertyType.toLowerCase().includes('land') ||
