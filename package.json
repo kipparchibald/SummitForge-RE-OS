@@ -1,6 +1,6 @@
 {
   "name": "summitforge-re-os",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'No test suite yet — see docs/STATUS.md' && exit 0"
+    "test": "npm run test:smoke",
+    "test:smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
