@@ -16,7 +16,8 @@ export interface LandScanResult {
 
 export async function scanLandDeals(opts: { minAcres?: number; limit?: number } = {}): Promise<LandScanResult> {
   const minAcres = opts.minAcres ?? 5;
-  const res = await fetchArchibaldNavicaListings(opts.limit ?? 100);
+  // Land development pipeline — land/acreage only (not the full MLS board)
+  const res = await fetchArchibaldNavicaListings(opts.limit ?? 100, { landOnly: true });
   const deals: ScoredDeal[] = [];
   for (const l of res.listings) {
     if (!l.acres || l.acres < minAcres || !l.price) continue;

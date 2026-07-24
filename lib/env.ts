@@ -35,7 +35,8 @@ export const DEMO_MODE = isDemoMode();
 export const ENV_REQUIREMENTS = {
   requiredForLive: [
     'NEXT_PUBLIC_MAPBOX_TOKEN',
-    'OPENAI_API_KEY',
+    // Prefer XAI_API_KEY (Grok); OPENAI_API_KEY also accepted
+    'XAI_API_KEY or OPENAI_API_KEY',
   ],
   recommendedForProd: [
     'NEXT_PUBLIC_SUPABASE_URL',
@@ -69,9 +70,17 @@ export function validateEnv(): EnvValidationResult {
     const msg = 'NEXT_PUBLIC_MAPBOX_TOKEN missing or placeholder — maps use demo fallback';
     if (isDemo) warnings.push(msg); else warnings.push(msg);
   }
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes('your-')) {
-    const msg = 'OPENAI_API_KEY missing — AI Assistants use demo/simulated responses';
-    if (isDemo) warnings.push(msg); else warnings.push(msg);
+  const hasXai =
+    (process.env.XAI_API_KEY && !/your[_-]?|xxx|placeholder/i.test(process.env.XAI_API_KEY)) ||
+    (process.env.GROK_API_KEY && !/your[_-]?|xxx|placeholder/i.test(process.env.GROK_API_KEY));
+  const hasOpenAI =
+    process.env.OPENAI_API_KEY &&
+    !process.env.OPENAI_API_KEY.includes('your-') &&
+    process.env.OPENAI_API_KEY.length > 20;
+  if (!hasXai && !hasOpenAI) {
+    const msg =
+      'XAI_API_KEY / OPENAI_API_KEY missing — AI Assistants use demo/simulated responses';
+    warnings.push(msg);
   }
 
   // Supabase (data persistence)
@@ -133,9 +142,11 @@ export function getEnvStatusMessage(): string {
   return `Production mode. Warnings: ${result.warnings.length}`;
 }
 
-export default {
+const envApi = {
   isDemoMode,
   DEMO_MODE,
   validateEnv,
   ENV_REQUIREMENTS,
 };
+
+export default envApi;

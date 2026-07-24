@@ -55,16 +55,225 @@ export function estimateYield(grossAcres: number, p: CountyPreset) {
   return { lots, roadLF, frontLF, netAcres: +net.toFixed(2) };
 }
 
-// 2025-26 Idaho/ISPWC planning ranges (per LF of road, per lot, lump).
-const ROAD_UNIT = { county: 18 + 22 + 38 + 12 + 22, city: 28 + 30 + 55 + 34 + 30 + 8 + 48 + 60 + 30 };
-export function infraCost(roadLF: number, lots: number, urban: boolean): number {
-  const road = (urban ? ROAD_UNIT.city : ROAD_UNIT.county) * roadLF;
-  const perLot = (urban ? 2800 + 2500 + 2500 + 4500 : 12000 + 14000 + 3500) * lots;
-  const misc = urban ? 100000 : 43000;
-  const constr = road + perLot + misc;
-  const mob = 0.05 * constr, cm = constr + mob;
-  const eng = 0.12 * cm, permits = (urban ? 0.06 : 0.03) * cm, cont = 0.15 * cm;
-  return Math.round(constr + mob + eng + permits + cont);
+/**
+ * City of Rigby R-1 annexation yield preset (8,000 sq ft lots, ~22% ROW).
+ * Finished city lots typically clear lower per lot than rural acreage lots.
+ */
+export const RIGBY_CITY_PRESET: CountyPreset = {
+  key: 'RigbyCityR1',
+  label: 'City of Rigby R-1 (annexed · city utilities)',
+  lotAcres: 8000 / 43560,
+  roadFactor: 0.22,
+  frontageFtPerLot: 80,
+  urban: true,
+  lotPrice: 95000, // city SF lot planning average E. Idaho
+  absorption: 5,
+  rowFt: 60,
+  pavementFt: 36,
+};
+
+// ─── Infrastructure unit costs (2025–26 Eastern Idaho / ISPWC-style planning) ───
+// City figures reflect full urban section: curb & gutter, sidewalks, storm,
+// water + sewer mains, street lights. County = rural road + septic/well path.
+// Sources: ISPWC unit ranges, Idaho city CIP/impact fee digests, local street
+// reconstruction bids (planning-grade — not a bid).
+
+export type InfraProfile = 'county' | 'city';
+
+export type InfraLineItem = {
+  key: string;
+  label: string;
+  unit: 'LF' | 'lot' | 'LS';
+  unitCost: number;
+  qty: number;
+  total: number;
+};
+
+export type InfraBreakdown = {
+  profile: InfraProfile;
+  profileLabel: string;
+  roadLF: number;
+  lots: number;
+  /** Construction subtotal before softs */
+  construction: number;
+  mobilization: number;
+  engineering: number;
+  permitsFees: number;
+  contingency: number;
+  /** All-in developer infrastructure cost */
+  total: number;
+  perLot: number;
+  perRoadLF: number;
+  lineItems: InfraLineItem[];
+  notes: string[];
+};
+
+/** Per-LF street section components */
+const ROAD_LF_COUNTY = {
+  earthwork: 18,
+  aggregateBase: 22,
+  asphalt: 38,
+  drainageDitch: 12,
+  gravelShoulder: 22,
+  // no curb/sidewalk/water/sewer in rural section
+};
+
+const ROAD_LF_CITY = {
+  earthwork: 28,
+  aggregateBase: 32,
+  asphalt: 58, // wider city section
+  curbGutterBoth: 42, // both sides
+  sidewalkBoth: 36,
+  stormDrain: 52,
+  waterMain: 72, // 8" PVC + valves/hydrants prorated
+  sewerMain: 78, // 8" SDR + manholes prorated
+  dryUtilities: 12, // conduit / trench for power/telecom
+  streetLights: 18, // poles + feed prorated per LF
+};
+
+/** Per-lot service connections & fees */
+const PER_LOT_COUNTY = {
+  septic: 12000,
+  wellOrSharedWater: 14000,
+  powerTelecom: 3500,
+};
+
+const PER_LOT_CITY = {
+  waterLateralMeter: 3200,
+  sewerLateral: 3800,
+  waterConnectionFee: 4500, // typical small-city impact/connection band
+  sewerConnectionFee: 4200,
+  drivewayCurbCut: 1800,
+  streetTreeSidewalk: 900,
+};
+
+const LUMP_COUNTY = { stormBasinGrading: 25000, entranceSignage: 8000, surveyingBonds: 10000 };
+const LUMP_CITY = {
+  liftStationOrOutfall: 85000, // if needed — averaged contingency lump
+  parkOpenSpace: 25000,
+  cityEntrance: 15000,
+  surveyingBonds: 18000,
+  stormPond: 45000,
+};
+
+function line(
+  key: string,
+  label: string,
+  unit: InfraLineItem['unit'],
+  unitCost: number,
+  qty: number
+): InfraLineItem {
+  return { key, label, unit, unitCost, qty, total: Math.round(unitCost * qty) };
+}
+
+/**
+ * Detailed infrastructure cost model — county rural vs city (curb/gutter/water/sewer).
+ */
+export function infraCostBreakdown(
+  roadLF: number,
+  lots: number,
+  profile: InfraProfile | boolean = false
+): InfraBreakdown {
+  const urban = profile === true || profile === 'city';
+  const p: InfraProfile = urban ? 'city' : 'county';
+  const lf = Math.max(0, roadLF);
+  const n = Math.max(0, lots);
+  const items: InfraLineItem[] = [];
+
+  if (urban) {
+    const r = ROAD_LF_CITY;
+    items.push(line('earthwork', 'Earthwork / subgrade', 'LF', r.earthwork, lf));
+    items.push(line('base', 'Aggregate base', 'LF', r.aggregateBase, lf));
+    items.push(line('asphalt', 'Asphalt pavement (city width)', 'LF', r.asphalt, lf));
+    items.push(line('curb', 'Curb & gutter (both sides)', 'LF', r.curbGutterBoth, lf));
+    items.push(line('sidewalk', 'Sidewalks (both sides)', 'LF', r.sidewalkBoth, lf));
+    items.push(line('storm', 'Storm drain (pipe + inlets)', 'LF', r.stormDrain, lf));
+    items.push(line('waterMain', 'Water main (8″ + appurtenances)', 'LF', r.waterMain, lf));
+    items.push(line('sewerMain', 'Sewer main (8″ + manholes)', 'LF', r.sewerMain, lf));
+    items.push(line('dryUtil', 'Dry utilities trench/conduit', 'LF', r.dryUtilities, lf));
+    items.push(line('lights', 'Street lights (prorated)', 'LF', r.streetLights, lf));
+
+    const pl = PER_LOT_CITY;
+    items.push(line('wLat', 'Water service lateral + meter', 'lot', pl.waterLateralMeter, n));
+    items.push(line('sLat', 'Sewer service lateral', 'lot', pl.sewerLateral, n));
+    items.push(line('wFee', 'City water connection / impact fee', 'lot', pl.waterConnectionFee, n));
+    items.push(line('sFee', 'City sewer connection / impact fee', 'lot', pl.sewerConnectionFee, n));
+    items.push(line('drive', 'Driveway apron / curb cut', 'lot', pl.drivewayCurbCut, n));
+    items.push(line('tree', 'Park strip / street tree allowance', 'lot', pl.streetTreeSidewalk, n));
+
+    const L = LUMP_CITY;
+    items.push(line('lift', 'Lift station / outfall allowance', 'LS', L.liftStationOrOutfall, 1));
+    items.push(line('pond', 'Storm detention pond', 'LS', L.stormPond, 1));
+    items.push(line('park', 'Open space / park fee allowance', 'LS', L.parkOpenSpace, 1));
+    items.push(line('entry', 'Entry / monument allowance', 'LS', L.cityEntrance, 1));
+    items.push(line('survey', 'Survey, staking, bonds (city)', 'LS', L.surveyingBonds, 1));
+  } else {
+    const r = ROAD_LF_COUNTY;
+    items.push(line('earthwork', 'Earthwork / subgrade', 'LF', r.earthwork, lf));
+    items.push(line('base', 'Aggregate base', 'LF', r.aggregateBase, lf));
+    items.push(line('asphalt', 'Asphalt pavement (rural width)', 'LF', r.asphalt, lf));
+    items.push(line('ditch', 'Roadside drainage ditch', 'LF', r.drainageDitch, lf));
+    items.push(line('shoulder', 'Gravel shoulder', 'LF', r.gravelShoulder, lf));
+
+    const pl = PER_LOT_COUNTY;
+    items.push(line('septic', 'Septic system (per lot)', 'lot', pl.septic, n));
+    items.push(line('well', 'Well or shared water system', 'lot', pl.wellOrSharedWater, n));
+    items.push(line('power', 'Power / telecom drop', 'lot', pl.powerTelecom, n));
+
+    const L = LUMP_COUNTY;
+    items.push(line('basin', 'Storm / retention grading', 'LS', L.stormBasinGrading, 1));
+    items.push(line('entry', 'Entrance / signage', 'LS', L.entranceSignage, 1));
+    items.push(line('survey', 'Survey, staking, bonds (county)', 'LS', L.surveyingBonds, 1));
+  }
+
+  const construction = items.reduce((s, i) => s + i.total, 0);
+  const mobilization = Math.round(0.05 * construction);
+  const afterMob = construction + mobilization;
+  const engineering = Math.round(0.12 * afterMob);
+  const permitsFees = Math.round((urban ? 0.07 : 0.03) * afterMob); // city plan review / impact admin
+  const contingency = Math.round(0.15 * afterMob);
+  const total = construction + mobilization + engineering + permitsFees + contingency;
+
+  const notes = urban
+    ? [
+        'City profile: full urban street (curb & gutter, sidewalks, storm, water & sewer mains, lights).',
+        'Per-lot city water/sewer laterals + typical small-city connection/impact fees included.',
+        'Unit costs are 2025–26 Eastern Idaho planning averages (ISPWC-style) — not a contractor bid.',
+        'Lift station / outfall is a site-contingent allowance; may be $0 if gravity to city main.',
+      ]
+    : [
+        'County/rural profile: paved local road without curb/gutter or city utilities.',
+        'Per-lot septic + well (or shared well) dominate rural infrastructure cost.',
+        'Unit costs are 2025–26 Eastern Idaho planning averages — not a contractor bid.',
+      ];
+
+  return {
+    profile: p,
+    profileLabel: urban
+      ? 'City infrastructure (water, sewer, curb & gutter)'
+      : 'County / rural infrastructure (septic, well, rural road)',
+    roadLF: lf,
+    lots: n,
+    construction,
+    mobilization,
+    engineering,
+    permitsFees,
+    contingency,
+    total,
+    perLot: n > 0 ? Math.round(total / n) : total,
+    perRoadLF: lf > 0 ? Math.round(total / lf) : 0,
+    lineItems: items,
+    notes,
+  };
+}
+
+/** All-in infra $ (backward compatible). */
+export function infraCost(
+  roadLF: number,
+  lots: number,
+  urban: boolean | InfraProfile = false
+): number {
+  return infraCostBreakdown(roadLF, lots, urban).total;
 }
 
 export interface FeasibilityInputs {
@@ -94,22 +303,59 @@ export interface LandAnalysis {
   county: string; preset: string; acres: number; lots: number; roadLF: number;
   devCost: number; lotPrice: number; grossRevenue: number; maxOffer: number; asking: number;
   spread: number; verdict: string; months: number; profitAtList: number; marginAtList: number; profitPerLot: number;
+  scenario?: string;
+  urban?: boolean;
+  infra?: InfraBreakdown;
 }
 
+export type AnalyzeOpts = {
+  lotPrice?: number;
+  county?: string;
+  /** 'county' | 'rigby_r1_annexed' */
+  scenario?: string;
+  /** Override yield/road from a real plat engine run */
+  lots?: number;
+  roadLF?: number;
+};
+
 /** One-call analysis for a Navica/NormalizedListing (needs acres + price). */
-export function analyzeListing(listing: ListingLike, opts: { lotPrice?: number; county?: string } = {}): LandAnalysis | null {
+export function analyzeListing(listing: ListingLike, opts: AnalyzeOpts = {}): LandAnalysis | null {
   const acres = Number(listing.acres) || 0;
   const asking = Number(listing.price) || 0;
   if (acres <= 0 || asking <= 0) return null;
   const city = listing.rawData?.City || listing.rawData?.city || listing.address || '';
   const county = opts.county || inferCounty(city);
-  const p = presetFor(county);
-  const y = estimateYield(acres, p);
-  const devCost = infraCost(y.roadLF, y.lots, p.urban);
+  const annexed =
+    opts.scenario === 'rigby_r1_annexed' ||
+    opts.scenario === 'rigby' ||
+    opts.scenario === 'annex_rigby';
+
+  const p = annexed ? RIGBY_CITY_PRESET : presetFor(county);
+  const y =
+    opts.lots != null && opts.roadLF != null
+      ? {
+          lots: opts.lots,
+          roadLF: opts.roadLF,
+          frontLF: opts.lots * p.frontageFtPerLot,
+          netAcres: acres * (1 - p.roadFactor),
+        }
+      : estimateYield(acres, p);
+
+  const infra = infraCostBreakdown(y.roadLF, y.lots, p.urban || annexed);
+  const devCost = infra.total;
   const lotPrice = opts.lotPrice ?? p.lotPrice;
   const f = feasibility(y.lots, devCost, { lotPrice, absorption: p.absorption, asking });
   return {
-    county, preset: p.label, acres: +acres.toFixed(2), lots: y.lots, roadLF: y.roadLF,
-    devCost, lotPrice, ...f,
+    county: annexed ? 'Jefferson (Rigby city scenario)' : county,
+    preset: p.label,
+    acres: +acres.toFixed(2),
+    lots: y.lots,
+    roadLF: y.roadLF,
+    devCost,
+    lotPrice,
+    scenario: annexed ? 'rigby_r1_annexed' : 'county',
+    urban: p.urban || annexed,
+    infra,
+    ...f,
   };
 }

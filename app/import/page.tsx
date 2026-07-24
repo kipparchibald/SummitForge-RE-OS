@@ -21,37 +21,59 @@ interface ImportedListing {
 // Module-scope so its identity is stable across ImportPage renders. When this
 // was defined inside the component, every keystroke gave it a new identity and
 // React remounted the subtree, so the search input lost focus after each letter.
+const TYPE_FILTERS = [
+  '',
+  'Single Family',
+  'New Construction',
+  'Land',
+  'Farm/Ranch',
+  'Multi-Family',
+  'Condo/Townhome',
+  'Commercial',
+] as const;
+
 const SearchFilters = ({
   searchTerm, setSearchTerm, minAcres, setMinAcres, maxPrice, setMaxPrice,
-  locationFilter, setLocationFilter, sortBy, setSortBy, useFuzzy, setUseFuzzy,
+  locationFilter, setLocationFilter, typeFilter, setTypeFilter,
+  sortBy, setSortBy, useFuzzy, setUseFuzzy,
   onClear, onSemanticAI, isLoading, isSearching, lastSearchSource
 }: any) => (
-  <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm w-full md:w-auto">
+  <div className="grid grid-cols-2 md:grid-cols-7 gap-2 text-sm w-full md:w-auto">
     <input
       type="text"
       placeholder="Search address, MLS #, description..."
       value={searchTerm}
       onChange={e => setSearchTerm(e.target.value)}
-      className="border p-2 rounded col-span-2 md:col-span-2"
+      className="border p-2 rounded-lg col-span-2 md:col-span-2"
     />
+    <select
+      value={typeFilter}
+      onChange={e => setTypeFilter(e.target.value)}
+      className="border p-2 rounded-lg"
+    >
+      <option value="">All property types</option>
+      {TYPE_FILTERS.filter(Boolean).map((t) => (
+        <option key={t} value={t}>{t}</option>
+      ))}
+    </select>
     <input
       type="number"
       placeholder="Min acres"
       value={minAcres}
       onChange={e => setMinAcres(e.target.value)}
-      className="border p-2 rounded"
+      className="border p-2 rounded-lg"
     />
     <input
       type="number"
       placeholder="Max price $"
       value={maxPrice}
       onChange={e => setMaxPrice(e.target.value)}
-      className="border p-2 rounded"
+      className="border p-2 rounded-lg"
     />
     <select
       value={locationFilter}
       onChange={e => setLocationFilter(e.target.value)}
-      className="border p-2 rounded"
+      className="border p-2 rounded-lg"
     >
       <option value="">All locations</option>
       {COUNTIES.map(({ county, locations }) => (
@@ -62,25 +84,26 @@ const SearchFilters = ({
         </optgroup>
       ))}
     </select>
-    <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="border p-2 rounded">
-      <option value="acres-desc">Sort: Acres ↓</option>
-      <option value="score">Sort: Relevance ↓</option>
+    <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="border p-2 rounded-lg">
+      <option value="price-desc">Sort: Price ↓</option>
       <option value="price-asc">Price ↑</option>
-      <option value="price-desc">Price ↓</option>
+      <option value="acres-desc">Acres ↓</option>
+      <option value="score">Relevance ↓</option>
     </select>
-    <button onClick={onClear} className="text-xs border px-2 py-1 rounded hover:bg-gray-50">Clear</button>
+    <button type="button" onClick={onClear} className="text-xs border px-2 py-1 rounded-lg hover:bg-gray-50">Clear</button>
 
-    <div className="col-span-2 md:col-span-6 flex items-center gap-3 mt-1 flex-wrap">
+    <div className="col-span-2 md:col-span-7 flex items-center gap-3 mt-1 flex-wrap">
       <label className="flex items-center gap-1 text-xs cursor-pointer">
         <input type="checkbox" checked={useFuzzy} onChange={e => setUseFuzzy(e.target.checked)} />
-        Use fuzzy (Levenshtein + score) + MLS/desc
+        Fuzzy search (MLS # / address / description)
       </label>
       <button
+        type="button"
         onClick={onSemanticAI}
         disabled={isLoading || isSearching}
-        className="text-xs px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-60"
+        className="text-xs px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-60"
       >
-        🧠 Semantic Search with AI
+        Semantic Search with AI
       </button>
       <span className="text-[10px] text-gray-400">{isSearching ? 'Searching DB live...' : lastSearchSource}</span>
     </div>
@@ -105,7 +128,9 @@ export default function ImportPage() {
   // render makes server and client HTML disagree (hydration error).
   const [lastLiveSync, setLastLiveSync] = useState('');
   const [syncIsRecent, setSyncIsRecent] = useState(false);
-  const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'acres-desc' | 'newest' | 'score'>('acres-desc');
+  const [sortBy, setSortBy] = useState<'price-asc' | 'price-desc' | 'acres-desc' | 'newest' | 'score'>('price-desc');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [typeSummary, setTypeSummary] = useState<Record<string, number>>({});
 
   // Deeper live search state: DB + fuzzy + AI
   const [dbListings, setDbListings] = useState<any[]>([]);
@@ -151,13 +176,19 @@ export default function ImportPage() {
         return matchesSearch;
       });
 
-  // Apply other filters
+  // Apply other filters (type / acres / price / location)
   filteredListings = filteredListings.filter((l: any) => {
     const acres = l.acres || 0;
     const matchesAcres = !minAcres || acres >= parseFloat(minAcres);
     const matchesPrice = !maxPrice || l.price <= parseFloat(maxPrice);
     const matchesLoc = !locationFilter || l.address.toLowerCase().includes(locationFilter.toLowerCase());
-    return matchesAcres && matchesPrice && matchesLoc;
+    const pt = (l.propertyType || '').toLowerCase();
+    const matchesType =
+      !typeFilter ||
+      pt.includes(typeFilter.toLowerCase()) ||
+      (typeFilter === 'Condo/Townhome' && (pt.includes('condo') || pt.includes('town'))) ||
+      (typeFilter === 'Land' && (pt.includes('land') || pt.includes('vacant') || pt.includes('lot')));
+    return matchesAcres && matchesPrice && matchesLoc && matchesType;
   });
 
   // Automated sorting for live search results (score-aware)
@@ -311,7 +342,17 @@ export default function ImportPage() {
           setLastSyncTimestamp(ts);
           setLastLiveSync(formatLastSyncTime(ts));
           if (typeof window !== 'undefined') window.dispatchEvent(new Event('navica-pull-updated'));
-          setStatus(`✅ Live Navica pull complete. ${data.imported} land parcels imported from ${data.source}.`);
+          const byType: Record<string, number> = {};
+          for (const l of data.listings as ImportedListing[]) {
+            const k = l.propertyType || 'Other';
+            byType[k] = (byType[k] || 0) + 1;
+          }
+          setTypeSummary(byType);
+          const landN = data.landCount ?? 0;
+          setStatus(
+            `✅ Live Navica pull complete. ${data.imported ?? data.listings.length} MLS listings` +
+              ` (${landN} land) from ${data.source}. Full board: homes, land, multi, commercial.`
+          );
         } else {
           setStatus(data.error || 'Live pull completed (see console).');
         }
@@ -395,21 +436,24 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-6 sm:p-8 max-w-6xl mx-auto">
       <div className="page-header">
-        <h1>Import Listings</h1>
-        <p>Bring in opportunities from multiple sources. Connect live Navica IDX from Archibald-Bagley for real-time Eastern Idaho data.</p>
+        <h1 className="text-3xl font-semibold tracking-tight">MLS Import &amp; Inventory</h1>
+        <p className="text-gray-600 mt-1">
+          Full Snake River / Archibald-Bagley board — homes, new construction, land, multi-family,
+          farm, and commercial. Not land-only.
+        </p>
       </div>
 
-      <div className="card p-8 mb-6">
+      <div className="rounded-2xl border bg-white p-6 sm:p-8 mb-6 shadow-sm">
         <div className="mb-4">
           <label className="text-sm font-medium block mb-1">Source</label>
-          <select value={source} onChange={e => setSource(e.target.value as any)} className="border p-3 rounded-lg w-full">
+          <select value={source} onChange={e => setSource(e.target.value as any)} className="border p-3 rounded-xl w-full">
+            <option value="navica">Navica IDX — full MLS (recommended)</option>
             <option value="mls">MLS CSV Export</option>
+            <option value="idx-site">My IDX Site — public listings</option>
             <option value="zillow">Zillow</option>
             <option value="landwatch">LandWatch / Lands of America</option>
-            <option value="idx-site">My IDX Site — real MLS listings (Live)</option>
-            <option value="navica">Navica IDX - Archibald-Bagley (Live)</option>
           </select>
         </div>
 
@@ -426,21 +470,27 @@ export default function ImportPage() {
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
+            type="button"
             onClick={() => handleImport()}
             disabled={isLoading}
-            className="btn-primary flex-1 py-3 rounded-2xl font-semibold disabled:opacity-60"
+            className="btn-primary flex-1 min-w-[200px] py-3 rounded-2xl font-semibold disabled:opacity-60"
           >
-            {isLoading ? 'Connecting...' : (source === 'navica' ? 'Pull Live Navica Data' : 'Import & Trigger Analysis')}
+            {isLoading
+              ? 'Connecting…'
+              : source === 'navica'
+                ? 'Pull full MLS board (all types)'
+                : 'Import & match alerts'}
           </button>
 
           <button
+            type="button"
             onClick={pullLiveNavica}
             disabled={isLoading}
-            className="px-6 py-3 rounded-2xl border font-medium hover:bg-gray-50 disabled:opacity-60"
+            className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-medium hover:bg-emerald-500 disabled:opacity-60"
           >
-            ⚡ Pull Live from Archibald-Bagley Navica
+            ⚡ Live Navica · all listings
           </button>
         </div>
 
@@ -463,27 +513,63 @@ export default function ImportPage() {
         {status && <div className="mt-4 p-3 bg-emerald-50 text-sm rounded-xl">{status}</div>}
       </div>
 
+      {/* Type chips */}
+      {Object.keys(typeSummary).length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {Object.entries(typeSummary)
+            .sort((a, b) => b[1] - a[1])
+            .map(([t, n]) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTypeFilter(typeFilter === t ? '' : t)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                  typeFilter === t
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400'
+                }`}
+              >
+                {t} · {n}
+              </button>
+            ))}
+        </div>
+      )}
+
       {/* Results + Enhanced Search/Filters */}
       {importedListings.length > 0 && (
-        <div className="card p-6">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 mb-4">
             <div>
-              <div className="font-semibold">Imported + Live DB + Recent Land Parcels</div>
-              <div className="text-xs text-gray-500">Showing {filteredListings.length} matches (hybrid fuzzy + queryListings + recent)</div>
+              <div className="font-semibold text-lg">MLS inventory board</div>
+              <div className="text-xs text-gray-500">
+                Showing {filteredListings.length} of {uniqueSources.length} listings · all property
+                types
+              </div>
               {attribution && (
-                <div className="text-[10px] text-gray-500 mt-0.5">Listing data courtesy of {attribution}. Displayed under IDX rules.</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  Listing data courtesy of {attribution}. Displayed under IDX rules.
+                </div>
               )}
             </div>
 
-            {/* Search & Filter Controls - using reusable SearchFilters component */}
             <SearchFilters
               searchTerm={searchTerm} setSearchTerm={setSearchTerm}
               minAcres={minAcres} setMinAcres={setMinAcres}
               maxPrice={maxPrice} setMaxPrice={setMaxPrice}
               locationFilter={locationFilter} setLocationFilter={setLocationFilter}
+              typeFilter={typeFilter} setTypeFilter={setTypeFilter}
               sortBy={sortBy} setSortBy={setSortBy}
               useFuzzy={useFuzzy} setUseFuzzy={setUseFuzzy}
-              onClear={() => { setSearchTerm(''); setMinAcres(''); setMaxPrice(''); setLocationFilter(''); setSortBy('acres-desc'); setDbListings([]); setAiSemanticResults(null); }}
+              onClear={() => {
+                setSearchTerm('');
+                setMinAcres('');
+                setMaxPrice('');
+                setLocationFilter('');
+                setTypeFilter('');
+                setSortBy('price-desc');
+                setDbListings([]);
+                setAiSemanticResults(null);
+              }}
               onSemanticAI={handleSemanticSearchWithAI}
               isLoading={isLoading} isSearching={isSearching} lastSearchSource={lastSearchSource}
             />
@@ -492,35 +578,69 @@ export default function ImportPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b">
-                  <th className="py-2 pr-4">Address / MLS</th>
-                  <th className="py-2 pr-4">Price</th>
-                  <th className="py-2 pr-4">Acres</th>
-                  <th className="py-2">Type</th>
-                  <th className="py-2 text-right">Score</th>
+                <tr className="text-left border-b bg-slate-50">
+                  <th className="py-2.5 px-2 pr-4 font-medium text-slate-500">Address / MLS</th>
+                  <th className="py-2.5 pr-4 font-medium text-slate-500">Price</th>
+                  <th className="py-2.5 pr-4 font-medium text-slate-500">Beds/Sqft</th>
+                  <th className="py-2.5 pr-4 font-medium text-slate-500">Acres</th>
+                  <th className="py-2.5 font-medium text-slate-500">Type</th>
+                  <th className="py-2.5 text-right font-medium text-slate-500">Score</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredListings.slice(0, 60).map((l, i) => (
-                  <tr key={i} className="border-b last:border-none hover:bg-gray-50">
-                    <td className="py-2 pr-4">
-                      {l.url ? <a href={l.url} target="_blank" className="underline">{l.address}</a> : l.address}
-                      {l.externalId && <div className="text-[10px] text-gray-500">MLS #: {l.externalId}</div>}
-                      {l.description && <div className="text-[10px] text-gray-400 truncate max-w-[280px]">{l.description.slice(0, 80)}</div>}
-                    </td>
-                    <td className="py-2 pr-4">${l.price.toLocaleString()}</td>
-                    <td className="py-2 pr-4">{l.acres ? l.acres : '—'}</td>
-                    <td className="py-2">{l.propertyType}</td>
-                    <td className="py-2 text-right font-mono text-xs">{l._score ? l._score.toFixed(2) : '—'}</td>
-                  </tr>
-                ))}
+                {filteredListings.slice(0, 100).map((l, i) => {
+                  const beds = (l as any).rawData?.beds ?? (l as any).beds;
+                  const sqft = (l as any).rawData?.sqft ?? (l as any).sqft;
+                  return (
+                    <tr key={i} className="border-b last:border-none hover:bg-slate-50/80">
+                      <td className="py-2.5 px-2 pr-4">
+                        {l.url ? (
+                          <a href={l.url} target="_blank" rel="noreferrer" className="font-medium text-sky-800 hover:underline">
+                            {l.address}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-slate-900">{l.address}</span>
+                        )}
+                        {l.externalId && (
+                          <div className="text-[10px] text-gray-500">MLS #: {l.externalId}</div>
+                        )}
+                        {l.description && (
+                          <div className="text-[10px] text-gray-400 truncate max-w-[320px]">
+                            {l.description.slice(0, 90)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 tabular-nums font-medium">
+                        ${l.price.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 pr-4 text-slate-600 text-xs">
+                        {beds != null ? `${beds} bd` : '—'}
+                        {sqft != null ? ` · ${Number(sqft).toLocaleString()} sf` : ''}
+                      </td>
+                      <td className="py-2.5 pr-4 tabular-nums">{l.acres != null ? l.acres : '—'}</td>
+                      <td className="py-2.5">
+                        <span className="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium">
+                          {l.propertyType || '—'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right font-mono text-xs text-slate-400">
+                        {l._score ? l._score.toFixed(2) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="mt-4 text-xs text-gray-500">
-            These parcels are now available for GIS analysis, AI valuation, and marketing plans.
-            Go to <Link href="/monitoring" className="underline">GIS Monitoring</Link> or <Link href="/ai-assistants" className="underline">AI Assistants</Link>.
-            Filters and search enhance discovery of the right raw land opportunities. Live = DB queryListings + recent + fuzzy.
+            Inventory is available for CMA, alerts, GIS (land), marketing, and AI agents.{' '}
+            <Link href="/cma" className="underline">CMA</Link>
+            {' · '}
+            <Link href="/alerts" className="underline">Alerts</Link>
+            {' · '}
+            <Link href="/monitoring" className="underline">GIS</Link>
+            {' · '}
+            <Link href="/ai-assistants" className="underline">AI Assistants</Link>
           </div>
 
           {/* AI Semantic Search Results Tie-in */}
@@ -535,8 +655,10 @@ export default function ImportPage() {
       )}
 
       <div className="mt-6 text-xs text-gray-500">
-        Configure real <code>NAVICA_IDX_URL</code> + <code>NAVICA_API_KEY</code> in .env for live Snake River MLS data.
-        Demo data is realistic Eastern Idaho raw land across all seven counties.
+        Configure <code className="bg-slate-100 px-1 rounded">NAVICA_IDX_URL</code> +{' '}
+        <code className="bg-slate-100 px-1 rounded">NAVICA_API_KEY</code> for live Snake River MLS.
+        Demo mode includes a full board (SFH, new construction, land, multi, condo, commercial, farm)
+        across Eastern Idaho counties.
       </div>
     </div>
   );

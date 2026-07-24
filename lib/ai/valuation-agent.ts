@@ -28,7 +28,11 @@ Format as clear, empathetic advice.`;
       recommendations: this.getTailoredRecommendations(property, userProfile),
       confidenceScore: 0.94,
       lastUpdated: new Date().toISOString(),
-      model: process.env.OPENAI_API_KEY ? 'gpt-4o-mini (trained)' : 'demo-mode'
+      model: process.env.XAI_API_KEY || process.env.GROK_API_KEY
+        ? 'grok (xAI)'
+        : process.env.OPENAI_API_KEY
+          ? 'gpt-4o-mini (trained)'
+          : 'demo-mode'
     };
   }
 

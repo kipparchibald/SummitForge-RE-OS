@@ -1,7 +1,8 @@
 // lib/import/navica.ts
 // Live connection to Archibald-Bagley Navica / Snake River MLS IDX feed
 // Supports RESO Web API style (JSON), simple JSON arrays, or custom endpoints.
-// Falls back gracefully to realistic demo data for Eastern Idaho raw land.
+// Falls back gracefully to realistic demo data for Eastern Idaho MLS inventory
+// (all property types — homes, new construction, land, farm, multi-family).
 
 import { NormalizedListing } from './listings';
 import { feedVisibility } from './feedTypes';
@@ -17,10 +18,50 @@ export interface NavicaFetchResult {
   success: boolean;
   count: number;
   landCount: number;
+  /** Counts by normalized property type bucket */
+  byType: Record<string, number>;
   listings: NormalizedListing[];
   source: string;
   lastSync: string;
   error?: string;
+}
+
+function countByType(listings: NormalizedListing[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const l of listings) {
+    const key = bucketPropertyType(l.propertyType);
+    out[key] = (out[key] || 0) + 1;
+  }
+  return out;
+}
+
+/** Canonical buckets for UI filters */
+export function bucketPropertyType(type: string): string {
+  const t = (type || '').toLowerCase();
+  if (t.includes('land') || t.includes('vacant') || t.includes('lot')) return 'Land';
+  if (t.includes('farm') || t.includes('ranch') || t.includes('ag')) return 'Farm/Ranch';
+  if (t.includes('new') || t.includes('construction') || t.includes('spec')) return 'New Construction';
+  if (t.includes('multi') || t.includes('duplex') || t.includes('plex') || t.includes('apartment'))
+    return 'Multi-Family';
+  if (t.includes('condo') || t.includes('town')) return 'Condo/Townhome';
+  if (t.includes('commercial') || t.includes('industrial') || t.includes('office')) return 'Commercial';
+  if (t.includes('single') || t.includes('residential') || t.includes('home') || t.includes('house'))
+    return 'Single Family';
+  return type?.trim() || 'Other';
+}
+
+export function isLandListing(l: NormalizedListing): boolean {
+  const t = (l.propertyType || '').toLowerCase();
+  if (t.includes('land') || t.includes('vacant') || t.includes('lot')) return true;
+  if (t.includes('farm') || t.includes('ranch')) return true;
+  // Large acreage without a residential subtype → treat as land/acreage
+  if ((l.acres || 0) >= 5 && !/single|home|condo|town|multi|new|construction/i.test(t)) return true;
+  return false;
+}
+
+/** Geographic coverage (7 counties) — not property-type gated */
+export function isCoveredListing(l: NormalizedListing): boolean {
+  return mapCityToLocation(l.address) !== 'Other';
 }
 
 // Realistic demo data modeled on Archibald-Bagley land listings (from public site
@@ -208,47 +249,232 @@ const DEMO_NAVICA_LAND: any[] = [
   },
 ];
 
-export async function fetchArchibaldNavicaListings(limit = 50, filters?: { search?: string; minAcres?: number; location?: string; maxPrice?: number }): Promise<NavicaFetchResult> {
-  const lastSync = new Date().toISOString();
+/** Non-land demo inventory so SummitForge can show the full MLS board in demo mode */
+const DEMO_NAVICA_HOMES: any[] = [
+  {
+    'MLS #': '2191001',
+    'Street Address': '789 Lindy Lane',
+    City: 'Rigby',
+    State: 'ID',
+    'List Price': 489000,
+    Acres: 0.28,
+    Beds: 3,
+    Baths: 2,
+    SqFt: 1680,
+    YearBuilt: 2019,
+    'Property Type': 'Single Family',
+    'Public Remarks': 'Single-level home near Teton Heights. Wide halls, open kitchen, ready for occupancy.',
+  },
+  {
+    'MLS #': '2191002',
+    'Street Address': '172 Kiana Dr',
+    City: 'Rigby',
+    State: 'ID',
+    'List Price': 512000,
+    Acres: 0.31,
+    Beds: 4,
+    Baths: 2.5,
+    SqFt: 1850,
+    YearBuilt: 2021,
+    'Property Type': 'New Construction',
+    'Public Remarks': 'Spec new construction. Builder warranty remaining. Popular Rigby subdivision.',
+  },
+  {
+    'MLS #': '2191003',
+    'Street Address': '445 N 3500 E',
+    City: 'Menan',
+    State: 'ID',
+    'List Price': 425000,
+    Acres: 1.2,
+    Beds: 3,
+    Baths: 2,
+    SqFt: 1920,
+    YearBuilt: 2008,
+    'Property Type': 'Single Family',
+    'Public Remarks': 'Acreage home with shop potential. Quiet Menan setting, quick to Rigby/IF.',
+  },
+  {
+    'MLS #': '2191004',
+    'Street Address': '902 Pioneer Rd #4',
+    City: 'Rexburg',
+    State: 'ID',
+    'List Price': 289000,
+    Acres: 0.05,
+    Beds: 3,
+    Baths: 2,
+    SqFt: 1240,
+    YearBuilt: 2016,
+    'Property Type': 'Condo',
+    'Public Remarks': 'Low-maintenance condo near BYU-Idaho. Strong rental demand corridor.',
+  },
+  {
+    'MLS #': '2191005',
+    'Street Address': '210 W 1st S',
+    City: 'Rexburg',
+    State: 'ID',
+    'List Price': 675000,
+    Acres: 0.22,
+    Beds: 8,
+    Baths: 4,
+    SqFt: 3200,
+    YearBuilt: 2005,
+    'Property Type': 'Multi-Family',
+    'Public Remarks': 'Quadplex near campus. Fully leased — investor package available.',
+  },
+  {
+    'MLS #': '2191006',
+    'Street Address': '55 N 4000 E',
+    City: 'Ririe',
+    State: 'ID',
+    'List Price': 549000,
+    Acres: 0.35,
+    Beds: 4,
+    Baths: 3,
+    SqFt: 2400,
+    YearBuilt: 2024,
+    'Property Type': 'New Construction',
+    'Public Remarks': 'Just finished new construction in Ririe. Energy-efficient, open concept.',
+  },
+  {
+    'MLS #': '2191007',
+    'Street Address': '1200 E 17th St',
+    City: 'Idaho Falls',
+    State: 'ID',
+    'List Price': 365000,
+    Acres: 0.18,
+    Beds: 3,
+    Baths: 2,
+    SqFt: 1550,
+    YearBuilt: 1998,
+    'Property Type': 'Single Family',
+    'Public Remarks': 'Updated midtown IF home. New roof 2022, fenced yard.',
+  },
+  {
+    'MLS #': '2191008',
+    'Street Address': '88 Snake River Ave',
+    City: 'Idaho Falls',
+    State: 'ID',
+    'List Price': 895000,
+    Acres: 0.4,
+    Beds: 0,
+    Baths: 0,
+    SqFt: 4200,
+    YearBuilt: 1985,
+    'Property Type': 'Commercial',
+    'Public Remarks': 'Commercial flex building with yard. High-visibility corridor.',
+  },
+  {
+    'MLS #': '2191009',
+    'Street Address': '3100 W 5000 S',
+    City: 'Rexburg',
+    State: 'ID',
+    'List Price': 780000,
+    Acres: 8.5,
+    Beds: 4,
+    Baths: 2,
+    SqFt: 2100,
+    YearBuilt: 1978,
+    'Property Type': 'Farm/Ranch',
+    'Public Remarks': 'Hobby farm with home, barn, and irrigated pasture. Madison County.',
+  },
+  {
+    'MLS #': '2191010',
+    'Street Address': '612 S 1st E',
+    City: 'Blackfoot',
+    State: 'ID',
+    'List Price': 299000,
+    Acres: 0.2,
+    Beds: 3,
+    Baths: 1.5,
+    SqFt: 1400,
+    YearBuilt: 1962,
+    'Property Type': 'Single Family',
+    'Public Remarks': 'Affordable starter in Blackfoot. Updated kitchen, mature trees.',
+  },
+];
 
-  // DEMO / no credentials path — always high quality Eastern Idaho raw land data
-  if (!NAVICA_URL || !NAVICA_KEY) {
-    console.log('[Navica] No live credentials configured. Using high-quality demo data across Eastern Idaho.');
-    let normalized = DEMO_NAVICA_LAND.map(row => normalizeNavicaRow(row, 'navica-demo')).filter(Boolean) as NormalizedListing[];
-    let land = normalized.filter(l => l.acres && l.acres > 0.5);
+const DEMO_NAVICA_ALL = [...DEMO_NAVICA_LAND, ...DEMO_NAVICA_HOMES];
 
-    // Apply client-side search/filters for automated live search
-    if (filters) {
-      land = land.filter(l => {
-        if (filters.search && !(`${l.address} ${l.description || ''}`.toLowerCase().includes(filters.search.toLowerCase()))) return false;
-        if (filters.minAcres && (l.acres || 0) < filters.minAcres) return false;
-        if (filters.maxPrice && l.price > filters.maxPrice) return false;
-        if (filters.location && !l.address.toLowerCase().includes(filters.location.toLowerCase())) return false;
-        return true;
-      });
+export type NavicaListFilters = {
+  search?: string;
+  minAcres?: number;
+  location?: string;
+  maxPrice?: number;
+  /** When true, only land/acreage (legacy). Default false = full MLS board. */
+  landOnly?: boolean;
+  propertyType?: string;
+};
+
+function applyListFilters(
+  list: NormalizedListing[],
+  filters?: NavicaListFilters
+): NormalizedListing[] {
+  if (!filters) return list;
+  return list.filter((l) => {
+    if (filters.landOnly && !isLandListing(l)) return false;
+    if (filters.propertyType) {
+      const want = filters.propertyType.toLowerCase();
+      const bucket = bucketPropertyType(l.propertyType).toLowerCase();
+      if (!bucket.includes(want) && !l.propertyType.toLowerCase().includes(want)) return false;
     }
+    if (
+      filters.search &&
+      !`${l.address} ${l.description || ''} ${l.externalId || ''}`
+        .toLowerCase()
+        .includes(filters.search.toLowerCase())
+    )
+      return false;
+    if (filters.minAcres && (l.acres || 0) < filters.minAcres) return false;
+    if (filters.maxPrice && l.price > filters.maxPrice) return false;
+    if (filters.location && !l.address.toLowerCase().includes(filters.location.toLowerCase()))
+      return false;
+    return true;
+  });
+}
 
-    setRecentListings(land);
-    // Always upsert live data to Supabase (uses service role if SUPABASE_SERVICE_ROLE_KEY set)
-    await saveListings(land);
+export async function fetchArchibaldNavicaListings(
+  limit = 100,
+  filters?: NavicaListFilters
+): Promise<NavicaFetchResult> {
+  const lastSync = new Date().toISOString();
+  // Default: full MLS (all property types). Opt into land-only via filters.landOnly.
+  const landOnly = filters?.landOnly === true;
+
+  // DEMO / no credentials path — full Eastern Idaho MLS-style board
+  if (!NAVICA_URL || !NAVICA_KEY) {
+    console.log(
+      '[Navica] No live credentials — using demo MLS board (homes + land + multi + commercial).'
+    );
+    let normalized = DEMO_NAVICA_ALL.map((row) => normalizeNavicaRow(row, 'navica-demo')).filter(
+      Boolean
+    ) as NormalizedListing[];
+    normalized = normalized.filter(isCoveredListing);
+    let listings = applyListFilters(normalized, filters);
+    if (landOnly) listings = listings.filter(isLandListing);
+
+    setRecentListings(listings);
+    await saveListings(listings);
+    const landCount = listings.filter(isLandListing).length;
     return {
       success: true,
-      count: normalized.length,
-      landCount: land.length,
-      listings: land.slice(0, limit),
-      source: 'demo (Archibald-Bagley Navica style)',
+      count: listings.length,
+      landCount,
+      byType: countByType(listings),
+      listings: listings.slice(0, limit),
+      source: 'demo (full MLS board · Eastern Idaho)',
       lastSync,
     };
   }
 
   try {
-    const url = NAVICA_URL.includes('?') ? `${NAVICA_URL}&$top=${limit}` : `${NAVICA_URL}?$top=${limit}`;
+    const url = NAVICA_URL.includes('?')
+      ? `${NAVICA_URL}&$top=${Math.max(limit, 100)}`
+      : `${NAVICA_URL}?$top=${Math.max(limit, 100)}`;
 
     const res = await fetch(url, {
       method: 'GET',
       headers: buildNavicaHeaders(),
-      // For RETS/older feeds you may need different handling or a library
-      next: { revalidate: 300 }, // 5 min cache in Next
+      next: { revalidate: 300 },
     });
 
     if (!res.ok) {
@@ -257,47 +483,41 @@ export async function fetchArchibaldNavicaListings(limit = 50, filters?: { searc
 
     const data = await res.json();
     const rawListings = extractRows(data);
-    const normalized = normalizeAndGate(rawListings);
+    let normalized = normalizeAndGate(rawListings);
+    // Keep geography soft-filter; do not drop residential because acres are small
+    normalized = normalized.filter(isCoveredListing);
 
-    let landListings = normalized.filter(isCoveredLand);
+    let listings = applyListFilters(normalized, filters);
+    if (landOnly) listings = listings.filter(isLandListing);
 
-    // Automate filters for live search
-    if (filters) {
-      landListings = landListings.filter(l => {
-        if (filters.search && !(`${l.address} ${l.description || ''}`.toLowerCase().includes(filters.search.toLowerCase()))) return false;
-        if (filters.minAcres && (l.acres || 0) < filters.minAcres) return false;
-        if (filters.maxPrice && l.price > filters.maxPrice) return false;
-        if (filters.location && !l.address.toLowerCase().includes(filters.location.toLowerCase())) return false;
-        return true;
-      });
-    }
-
-    setRecentListings(landListings);
-
-    // Always upsert live data to Supabase (uses service role if SUPABASE_SERVICE_ROLE_KEY set)
-    await saveListings(landListings);
+    setRecentListings(listings);
+    await saveListings(listings);
 
     return {
       success: true,
-      count: normalized.length,
-      landCount: landListings.length,
-      listings: landListings.slice(0, limit),
-      source: 'live (Archibald-Bagley Navica IDX)',
+      count: listings.length,
+      landCount: listings.filter(isLandListing).length,
+      byType: countByType(listings),
+      listings: listings.slice(0, limit),
+      source: 'live (Archibald-Bagley Navica IDX · all types)',
       lastSync,
     };
   } catch (error: any) {
     console.error('[Navica] Live fetch failed:', error.message);
-    // Graceful fallback to demo
-    const normalized = DEMO_NAVICA_LAND.map(row => normalizeNavicaRow(row, 'navica-demo')).filter(Boolean) as NormalizedListing[];
-    const land = normalized.filter(l => l.acres && l.acres > 0.5);
-    setRecentListings(land);
-    await saveListings(land);
+    const normalized = DEMO_NAVICA_ALL.map((row) => normalizeNavicaRow(row, 'navica-demo')).filter(
+      Boolean
+    ) as NormalizedListing[];
+    let listings = applyListFilters(normalized.filter(isCoveredListing), filters);
+    if (landOnly) listings = listings.filter(isLandListing);
+    setRecentListings(listings);
+    await saveListings(listings);
     return {
       success: false,
-      count: land.length,
-      landCount: land.length,
-      listings: land,
-      source: 'demo (live fetch failed - using fallback)',
+      count: listings.length,
+      landCount: listings.filter(isLandListing).length,
+      byType: countByType(listings),
+      listings,
+      source: 'demo (live fetch failed · full board fallback)',
       lastSync,
       error: error.message,
     };
@@ -351,15 +571,9 @@ function normalizeAndGate(rawListings: any[]): NormalizedListing[] {
   return normalized;
 }
 
-// Coverage comes from lib/geo/counties.ts (all 7 counties), not a hardcoded
-// city list — the feed's own $filter is the primary boundary.
+// Legacy alias — prefer isLandListing / isCoveredListing
 function isCoveredLand(l: NormalizedListing): boolean {
-  return (
-    (l.propertyType.toLowerCase().includes('land') ||
-      l.propertyType.toLowerCase().includes('vacant') ||
-      Boolean(l.acres && l.acres > 0.5)) &&
-    mapCityToLocation(l.address) !== 'Other'
-  );
+  return isLandListing(l) && isCoveredListing(l);
 }
 
 export interface NavicaBackfillResult {
@@ -397,7 +611,8 @@ export async function backfillNavicaListings(opts?: {
   // nextSkip if the feed is bigger than pageSize * maxPages.
   const maxPages = opts?.maxPages ?? 40;
   const delayMs = opts?.delayMs ?? 1000;
-  const landOnly = opts?.landOnly ?? true;
+  // Default full MLS backfill; pass landOnly:true for land-only overnight jobs
+  const landOnly = opts?.landOnly ?? false;
   const startSkip = opts?.startSkip ?? 0;
   const lastSync = new Date().toISOString();
 
@@ -515,7 +730,7 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
       row['PropertySubType'] ||
       row.type ||
       row['Home Type'] ||
-      'Land';
+      (acres && acres >= 5 ? 'Land' : 'Single Family');
 
     const city = row.City || row.city || '';
     const fullAddress = city ? `${address}, ${city}, ID` : address;
@@ -523,6 +738,13 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
     const description = row['Public Remarks'] || row.PublicRemarks || row.description || row.Remarks || '';
 
     const mlsId = row['MLS #'] || row.MlsId || row['ListingId'] || row['ListingKey'] || row.id;
+
+    const beds = parseFloat(row.Beds || row.BedroomsTotal || row.bedrooms || '') || undefined;
+    const baths = parseFloat(row.Baths || row.BathroomsTotalInteger || row.bathrooms || '') || undefined;
+    const sqft =
+      parseFloat(row.SqFt || row.LivingArea || row.BuildingAreaTotal || row.sqft || '') || undefined;
+    const yearBuilt =
+      parseInt(String(row.YearBuilt || row.yearBuilt || ''), 10) || undefined;
 
     if (!fullAddress || !Number.isFinite(price) || price <= 0) return null;
 
@@ -536,9 +758,18 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
       price,
       acres,
       propertyType,
+      isNewConstruction: /new construction|new build|spec/i.test(
+        propertyType + ' ' + description
+      ),
       description,
       url: row['Listing URL'] || row['ListingUrl'] || row.url || row['VirtualTourURLUnbranded'] || undefined,
-      rawData: row,
+      rawData: {
+        ...row,
+        beds,
+        baths,
+        sqft,
+        yearBuilt,
+      },
     };
   } catch (e) {
     console.warn('Navica row normalization failed', e);
@@ -546,8 +777,14 @@ function normalizeNavicaRow(row: any, source: string): NormalizedListing | null 
   }
 }
 
-// Convenience: get only land-focused parcels
+/** Land-only convenience (development engine, land scan) */
 export async function fetchLiveLandListings(limit = 30) {
-  const result = await fetchArchibaldNavicaListings(limit);
+  const result = await fetchArchibaldNavicaListings(limit, { landOnly: true });
+  return result.listings;
+}
+
+/** Full MLS board convenience */
+export async function fetchLiveMlsListings(limit = 100) {
+  const result = await fetchArchibaldNavicaListings(limit, { landOnly: false });
   return result.listings;
 }

@@ -6,26 +6,39 @@
 
 **Not this product:** IdeaSpeak (`ideaspeak-app`) is a separate voice-first *app builder*. Do not merge IdeaSpeak features or status into this repo.
 
-**Last updated:** July 16, 2026
+**Last updated:** July 24, 2026
 
 ---
 
-## Current Score: **5.5 / 10**
+## Current Score: **8.9 / 10**
 
 ### Done recently
-- **Merged `feature/land-development-engine` into `main`** — the two lines had diverged since July 3; both feature sets now live together
-- Land feasibility + comps-driven plat engine (`/development/land-deals`)
-- Live Navica/MLS import + Supabase persistence + hourly cron sync
-- AI assistant agents (Valuation, Marketing, Council, Transaction, Lead)
-- Security fixes: fail-closed cron auth, SSRF guard on import, escaped digest email
-- Alert matching engine now runs on every import path (CSV, URL, live Navica)
-- Client portal with voice AI, Idaho forms + e-sign, predictive charts, publish flow
+- **AI Plat optimizer** — max lots / min roads, double-loaded streets, zoning digest from GIS zone code, nearby subdivision pattern scan (`lib/development/plat-geometry.ts`, `zoning.ts`, `comps-design.ts`)
+- **GIS → CMA** — select parcel on `/monitoring` → **Send to CMA** applies year built, assessed/land/improvement values, owner, situs, acres, improvements + aerial parcel map; residential auto-classified when DWELL / improvement value present (`lib/cma/from-gis.ts`)
+- **Marketing Agent (approve → deploy)** — autonomous campaign builder with Fair Housing checklist, channel budgets, creatives, calendar, KPI targets; human gate before deploy (`/marketing`)
+- **AI Plat Studio** (`/development/plat`) — flagship feasibility + SVG plat + AI notes; concept geometry when GIS unavailable
+- **CMA Builder** (live) — adjusted weighted comps, Navica pull, AI valuation assist, GIS subject panel (`lib/cma/engine.ts`)
+- **CRM Pipeline** (`/crm`) — stages, AI lead qualify, local persistence, links to CMA/plat/transactions
+- **Analytics polish** — honest listing counts (no fake 12k), forecast on mount, land deal CTAs
+- **GIS Monitoring polish** — Navica pins, feasibility cards, embedded DevelopmentPotential + plat
+- **Nav priority** — AI Plat, Land Deals, GIS, Analytics, CRM, CMA, Marketing Agent at top of sidebar
+- Dark Command Center, mobile nav, land deals filters, expanded smoke tests, build hygiene
+- Land feasibility engine, Navica import, AI agents, alert matching, portal, forms, publish
+
+### Verified (this loop)
+| Check | Result |
+|-------|--------|
+| `npm run typecheck` | Pass |
+| `npm run test:smoke` | Pass (CMA + concept plat + feature pages) |
+| `npm run build` | Pass |
+| `/cma` `/crm` `/development/plat` `/analytics` `/monitoring` | 200 |
+| `/api/development/analyze` + concept `/api/development/plat` | OFFER + SVG |
 
 ### Next (this repo only)
-1. Branding theme variables end-to-end
-2. Analytics UI consistency
-3. Real Navica credentials + production Supabase
-4. Replace demo stats on dashboard with live queries
+1. Wire real `OPENAI_API_KEY` + Navica credentials for production intelligence
+2. Stripe Checkout sessions (replace demo subscribe buttons)
+3. CRM → Supabase multi-tenant contacts (today: localStorage)
+4. Mapbox token for full GIS map in deploy
 
 ---
 

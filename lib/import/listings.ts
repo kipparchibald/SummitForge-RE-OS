@@ -94,10 +94,10 @@ export async function importListings(
 
   // Special live Navica mode
   if (input === 'live-navica' || source === 'navica') {
-    const navicaResult = await fetchArchibaldNavicaListings(100, undefined); // filters passed from UI in future
-    // Ensure shared last sync is noted (server side + client will pick via localStorage on update)
+    // Full MLS board (all property types) — pass landOnly:true only for land-engine tools
+    const navicaResult = await fetchArchibaldNavicaListings(200, { landOnly: false });
     const result: ImportResult = {
-      imported: navicaResult.landCount,
+      imported: navicaResult.count,
       landCount: navicaResult.landCount,
       listings: navicaResult.listings,
       source: navicaResult.source,
@@ -156,19 +156,18 @@ export async function importListings(
     notifications = r.notifications;
   }
 
-  const landListings = normalized.filter(l =>
-    l.propertyType.toLowerCase().includes('land') ||
-    l.propertyType.toLowerCase().includes('vacant') ||
-    (l.acres && l.acres > 0.5)
+  // Persist the full MLS board — land, homes, multi-family, commercial, etc.
+  const landListings = normalized.filter(
+    (l) =>
+      l.propertyType.toLowerCase().includes('land') ||
+      l.propertyType.toLowerCase().includes('vacant') ||
+      l.propertyType.toLowerCase().includes('farm') ||
+      l.propertyType.toLowerCase().includes('ranch')
   );
 
-  if (landListings.length > 0) {
-    setRecentListings(landListings);
-  }
-
-  // Always persist live data to Supabase (service role used if SUPABASE_SERVICE_ROLE_KEY set)
-  if (landListings.length > 0) {
-    await saveListings(landListings);
+  if (normalized.length > 0) {
+    setRecentListings(normalized);
+    await saveListings(normalized);
   }
 
   for (const listing of landListings) {

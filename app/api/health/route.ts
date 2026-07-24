@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyListingsSchema, isSupabaseLive } from '@/lib/supabase/client';
 import { isDemoMode, validateEnv } from '@/lib/env';
+import { aiStatus } from '@/lib/ai/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +18,22 @@ export async function GET() {
   const navicaConfigured = !!(process.env.NAVICA_IDX_URL && process.env.NAVICA_API_KEY);
   const cronSecretSet = !!process.env.CRON_SECRET;
   const supabaseLive = isSupabaseLive();
+  const ai = aiStatus();
 
   const status = {
     ok: schema.ok,
     timestamp: new Date().toISOString(),
     mode: isDemoMode() ? 'demo' : 'production',
+    ai: {
+      live: ai.live,
+      provider: ai.provider,
+      model: ai.model,
+      hasXai: ai.hasXai,
+      hasOpenAI: ai.hasOpenAI,
+      note: ai.live
+        ? `Real synthesis via ${ai.provider} (${ai.model})`
+        : 'Demo mode — set XAI_API_KEY or OPENAI_API_KEY in .env.local',
+    },
     supabase: {
       configured: supabaseLive,
       schemaOk: schema.ok,

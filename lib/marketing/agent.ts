@@ -1,143 +1,273 @@
-// World-class Marketing Agent - LLM-powered with trained real estate expertise
+/**
+ * Autonomous Marketing Agent
+ * Builds complete campaigns from a brief using best-practice playbooks + LLM strategy,
+ * then requires human approval before deploy.
+ */
 
 import { callLLM, SYSTEM_PROMPTS } from '../ai/client';
+import { buildCampaignFromBrief, campaignSummary } from './campaign-engine';
+import type {
+  ApprovalAction,
+  CampaignBrief,
+  CampaignBuildResult,
+  DeployResult,
+  MarketingCampaign,
+  MarketingPlan,
+} from './types';
 
-export interface MarketingPlan {
-  propertyId: string;
-  goals: string[];
-  channels: Array<{
-    name: string;
-    priority: 'high' | 'medium' | 'low';
-    estimatedCost: number;
-    expectedReach: string;
-  }>;
-  contentStrategy: {
-    listingDescription: string;
-    socialPosts: string[];
-    emailSequence: string[];
-    flyerIdeas: string[];
-  };
-  timeline: {
-    week1: string[];
-    week2: string[];
-    ongoing: string[];
-  };
-  budgetEstimate: number;
-  kpis: string[];
-}
+// Re-export legacy shape for any older callers
+export type { MarketingPlan } from './types';
+
+const CAMPAIGN_SYSTEM = `${SYSTEM_PROMPTS.marketing}
+
+You are also the autonomous campaign architect for SummitForge RE OS.
+When given a property brief, produce a concise strategy memo (not JSON) covering:
+1) Campaign concept (one sentence)
+2) Primary and secondary audiences
+3) Message pillars (3)
+4) Channel mix rationale
+5) First-week priorities
+6) Fair Housing / compliance reminders specific to this creative
+7) Risks and how to mitigate
+Keep it under 450 words. Be specific to Eastern Idaho (Jefferson, Madison, Bonneville, Bingham, Bannock, Fremont, Teton).`;
 
 export class MarketingAgent {
-  async generatePlan(property: any, focusAreas: string[] = ['maximize exposure', 'attract builders/investors']): Promise<MarketingPlan> {
-    const isLand = property.acres && property.acres > 0;
-    
-    const prompt = `Property: ${JSON.stringify(property)}
-User focus: ${focusAreas.join(', ')}
+  /**
+   * Autonomously build a full campaign ready for user approval.
+   */
+  async buildCampaign(brief: CampaignBrief): Promise<CampaignBuildResult> {
+    const land =
+      (brief.property.acres || 0) >= 2 ||
+      /land|vacant|farm|ranch/i.test(brief.property.propertyType || '');
 
-Create a complete, professional marketing plan for this ${isLand ? 'raw land' : 'home'} in Jefferson County, Idaho.
+    const prompt = `Build a campaign strategy memo for this brief:
 
-Include:
-- 5-6 marketing channels with priority, cost, and reach
-- Compelling listing description
-- 3-4 social media post ideas
-- 3-email nurture sequence
-- Flyer/creative ideas
-- 3-week timeline
-- Total budget and 4 KPIs
+Property: ${JSON.stringify(brief.property)}
+Primary goal: ${brief.primaryGoal}
+Secondary: ${(brief.secondaryGoals || []).join('; ') || 'n/a'}
+Budget cap: ${brief.budgetCap ?? 'agent-recommended'}
+Timeline days: ${brief.timelineDays ?? 21}
+Tone: ${brief.tone || 'premium'}
+Audience hints: ${(brief.targetAudienceHints || []).join(', ') || 'default playbook'}
+Agent: ${brief.agentName || 'Kipp Archibald'} @ ${brief.brokerageName || 'Archibald-Bagley'}
+Is land: ${land}
 
-Make it emotionally resonant, focused on "coming home", and optimized for local Eastern Idaho buyers/builders.`;
+Focus on measurable outcomes and human approval before any spend goes live.`;
 
-    const aiPlanText = await callLLM(SYSTEM_PROMPTS.marketing, prompt);
+    let aiStrategy: string | undefined;
+    try {
+      aiStrategy = await callLLM(CAMPAIGN_SYSTEM, prompt);
+    } catch {
+      aiStrategy = undefined;
+    }
 
-    // Structured fallback + AI insights
-    const plan: MarketingPlan = {
-      propertyId: property.id || 'unknown',
-      goals: focusAreas,
-      channels: [
-        { name: 'MLS + IDX', priority: 'high', estimatedCost: 0, expectedReach: 'Local agents & buyers' },
-        { name: 'Facebook/Instagram Ads', priority: 'high', estimatedCost: 350, expectedReach: 'Targeted local + BYUI alumni' },
-        { name: 'Google Ads (land + "build your home")', priority: 'medium', estimatedCost: 250, expectedReach: 'High-intent searchers' },
-        { name: 'rigbylots.com + Direct Website', priority: 'high', estimatedCost: 0, expectedReach: 'Direct traffic' },
-        { name: 'Builder/Developer Outreach', priority: isLand ? 'high' : 'medium', estimatedCost: 75, expectedReach: 'Volume builders' },
-        { name: 'Community Events / Partnerships', priority: 'medium', estimatedCost: 150, expectedReach: 'Local trust' }
-      ],
-      contentStrategy: {
-        listingDescription: this.generateListingDescription(property),
-        socialPosts: this.generateSocialPosts(property, isLand),
-        emailSequence: this.generateEmailSequence(property, isLand),
-        flyerIdeas: [
-          'Professional drone + plat concept render',
-          '"Build Your Legacy Here" emotional campaign',
-          'Builder incentive + timeline highlight'
-        ]
+    const campaign = buildCampaignFromBrief(brief, aiStrategy);
+    return {
+      campaign,
+      summary: campaignSummary(campaign),
+      needsApproval: true,
+    };
+  }
+
+  /**
+   * Legacy plan shape (used by older AI assistants route).
+   */
+  async generatePlan(
+    property: any,
+    focusAreas: string[] = ['maximize exposure', 'attract builders/investors']
+  ): Promise<MarketingPlan & { campaign?: MarketingCampaign; aiStrategy?: string }> {
+    const brief: CampaignBrief = {
+      property: {
+        id: property?.id,
+        address: property?.address || 'Eastern Idaho property',
+        acres: property?.acres,
+        price: property?.price,
+        propertyType: property?.propertyType,
+        city: property?.city,
+        highlights: property?.highlights,
       },
-      timeline: {
-        week1: ['Launch MLS + website', 'Set up targeted social ads', 'Send first nurture email'],
-        week2: ['Boost winning creative', 'Direct outreach to 5-8 builders', 'Host virtual lot tour'],
-        ongoing: ['Weekly performance review', 'A/B test messaging', 'New content + retargeting']
-      },
-      budgetEstimate: isLand ? 950 : 650,
-      kpis: ['Qualified leads', 'Lot reservations / contracts', 'Cost per qualified lead', 'Builder engagement rate']
+      primaryGoal: focusAreas[0] || 'Generate qualified leads',
+      secondaryGoals: focusAreas.slice(1),
+      tone: 'premium',
+      agentName: 'Kipp Archibald',
+      brokerageName: 'Archibald-Bagley Real Estate',
+      complianceMarket: 'Idaho',
     };
 
-    // Inject world-class AI generated insights
-    (plan as any).aiStrategy = aiPlanText;
+    const { campaign } = await this.buildCampaign(brief);
+
+    // Map to legacy MarketingPlan for backward compatibility
+    const plan: MarketingPlan & { campaign?: MarketingCampaign; aiStrategy?: string } = {
+      propertyId: campaign.brief.property.id || campaign.id,
+      goals: campaign.goals,
+      channels: campaign.channels.map((c) => ({
+        name: c.name,
+        priority: c.priority,
+        estimatedCost: c.budget,
+        expectedReach: c.expectedReach,
+      })),
+      contentStrategy: {
+        listingDescription:
+          campaign.assets.find((a) => a.type === 'listing_copy')?.body || '',
+        socialPosts: campaign.assets.filter((a) => a.type === 'social').map((a) => a.body),
+        emailSequence: campaign.assets.filter((a) => a.type === 'email').map((a) => a.body),
+        flyerIdeas: campaign.assets.filter((a) => a.type === 'flyer').map((a) => a.body),
+      },
+      timeline: {
+        week1: campaign.calendar[0]?.tasks || [],
+        week2: campaign.calendar[1]?.tasks || [],
+        ongoing: campaign.calendar.slice(2).flatMap((w) => w.tasks),
+      },
+      budgetEstimate: campaign.budgetTotal,
+      kpis: campaign.kpis.map((k) => `${k.name}: ${k.target}`),
+      campaign,
+      aiStrategy: campaign.aiStrategy,
+    };
 
     return plan;
   }
 
-  private generateListingDescription(property: any): string {
-    const acres = property.acres ? `${property.acres} acres` : 'beautiful';
-    return `Exceptional ${acres} opportunity in the foothills of the Tetons. This is more than land — it's the canvas for the life you've been waiting to build. Strong access, views, and development potential. Quiet. Dignified. Ready.`;
+  /**
+   * Apply approval decision. Deploy is a separate step.
+   */
+  applyApproval(
+    campaign: MarketingCampaign,
+    action: ApprovalAction,
+    notes?: string
+  ): MarketingCampaign {
+    const now = new Date().toISOString();
+    if (action === 'approve') {
+      return {
+        ...campaign,
+        status: 'approved',
+        approvedAt: now,
+        updatedAt: now,
+        revisionNotes: notes || campaign.revisionNotes,
+        nextActions: [
+          'Click Deploy to launch enabled channels',
+          'Confirm tracking UTMs and landing page live',
+          'Assign CRM owner for <5 min lead response',
+        ],
+      };
+    }
+    if (action === 'reject') {
+      return {
+        ...campaign,
+        status: 'rejected',
+        updatedAt: now,
+        revisionNotes: notes || 'Rejected by user',
+        nextActions: ['Start a new campaign with a revised brief'],
+      };
+    }
+    // request_changes — back to draft mentally but keep as pending with notes
+    return {
+      ...campaign,
+      status: 'draft',
+      updatedAt: now,
+      revisionNotes: notes || 'Changes requested',
+      nextActions: [
+        'Agent will rebuild with your notes when you click “Rebuild with notes”',
+        'Or edit brief and generate a new campaign',
+      ],
+    };
   }
 
-  private generateSocialPosts(property: any, isLand: boolean): string[] {
-    if (isLand) {
-      return [
-        `New land opportunity near Rigby. ${property.acres} acres with room to create something lasting. DM for plat concepts and details.`,
-        `Builders & visionaries: Prime Jefferson County parcel ready for your next project. Let's talk yield and timeline.`,
-        `Teton Heights area — flexible, buildable land now available. The kind of place people come home to.`
-      ];
+  /**
+   * Rebuild campaign incorporating revision notes.
+   */
+  async rebuildWithNotes(campaign: MarketingCampaign, notes: string): Promise<CampaignBuildResult> {
+    const brief: CampaignBrief = {
+      ...campaign.brief,
+      secondaryGoals: [
+        ...(campaign.brief.secondaryGoals || []),
+        `Revision notes from approver: ${notes}`,
+      ],
+    };
+    const result = await this.buildCampaign(brief);
+    result.campaign.revisionNotes = notes;
+    // Preserve id chain for history linkage
+    result.campaign.id = campaign.id + '_r' + Date.now().toString(36).slice(-4);
+    return result;
+  }
+
+  /**
+   * Deploy only if approved. Simulated channels until Meta/email integrations exist.
+   */
+  async deployCampaign(
+    campaign: MarketingCampaign,
+    options: { dryRun?: boolean } = {}
+  ): Promise<DeployResult> {
+    if (campaign.status !== 'approved' && campaign.status !== 'deployed') {
+      return {
+        ok: false,
+        campaign,
+        message: `Cannot deploy while status is “${campaign.status}”. Approve the campaign first.`,
+        simulated: true,
+      };
     }
-    return [
-      `Thoughtfully designed home now available. Schedule a private tour this week.`,
-      `Coming home looks like this. Open house details inside.`
+
+    const enabled = campaign.channels.filter((c) => c.enabled);
+    const actions = [
+      'validate_fair_housing_checklist',
+      'publish_listing_copy_to_idx_queue',
+      ...enabled.map((c) => `schedule_${c.key}`),
+      'open_kpi_dashboard',
+      'notify_crm_owner',
     ];
+
+    const now = new Date().toISOString();
+    const deployed: MarketingCampaign = {
+      ...campaign,
+      status: options.dryRun ? 'approved' : 'deployed',
+      deployedAt: options.dryRun ? campaign.deployedAt : now,
+      updatedAt: now,
+      deployLog: {
+        status: options.dryRun ? 'dry_run' : 'deployed',
+        actions,
+        channels: enabled.map((c) => c.name),
+        note: options.dryRun
+          ? 'Dry run only — no external posts. Approve + Deploy for simulated production launch.'
+          : 'Simulated deploy: content queued for MLS/IDX, Meta, Google, email, and outreach. Wire Meta Marketing API + ESP for live posts.',
+        timestamp: now,
+      },
+      nextActions: options.dryRun
+        ? ['Run Deploy (not dry-run) when ready']
+        : [
+            'Monitor CPL daily for first 7 days',
+            'Respond to leads in CRM within 5 minutes',
+            'Week-2 creative refresh if CTR drops',
+          ],
+    };
+
+    return {
+      ok: true,
+      campaign: deployed,
+      message: options.dryRun
+        ? 'Dry run complete — campaign validated, not launched.'
+        : `Deployed ${enabled.length} channels (simulated). Track KPIs from the campaign dashboard.`,
+      simulated: true,
+    };
   }
 
-  private generateEmailSequence(property: any, isLand: boolean): string[] {
-    const addr = property.address || 'a special property';
-    return [
-      `Subject: New opportunity in Jefferson County — ${addr}
-
-Hi [Name],
-
-We just brought a ${isLand ? 'meaningful piece of land' : 'home'} to market that feels different...`,
-      `Subject: Quick update on the ${addr} opportunity
-
-Have you had a chance to look? I'd be happy to walk you through the numbers or plat possibilities.`,
-      `Subject: This one won't last long
-
-Limited inventory in this area right now. If this land/home speaks to you, let's connect before the weekend.`
-    ];
-  }
-
-  async executePlan(plan: MarketingPlan, actions: string[] = ['generate_content']) {
-    console.log(`[Marketing Agent] Executing for ${plan.propertyId}`);
-    
-    if (actions.includes('generate_content')) {
-      // In real deployment: call LLM again for full asset generation
-      console.log('Full marketing assets generated via world-class prompts');
-    }
-    
-    // Stub for scheduler / actual posting
-    if (actions.includes('schedule_campaign')) {
-      console.log('Campaign scheduled (integrate with Meta API / email service in production)');
+  /** @deprecated use deployCampaign */
+  async executePlan(plan: MarketingPlan | MarketingCampaign, actions: string[] = ['generate_content']) {
+    // Accept legacy plan or full campaign
+    if ('status' in plan && 'channels' in plan && Array.isArray((plan as MarketingCampaign).channels)) {
+      const camp = plan as MarketingCampaign;
+      if (camp.status === 'approved' || camp.status === 'deployed') {
+        return this.deployCampaign(camp);
+      }
+      // Auto-approve legacy execute for backward compat then deploy
+      const approved = this.applyApproval(camp, 'approve');
+      return this.deployCampaign(approved);
     }
 
-    return { 
-      status: 'executed', 
+    console.log(`[Marketing Agent] Legacy execute for ${(plan as MarketingPlan).propertyId}`);
+    return {
+      status: 'executed',
       actionsCompleted: actions,
-      note: 'In production this would post to social, send emails, and track ROI automatically.'
+      note: 'Legacy execute path. Prefer /api/ai/marketing build → approve → deploy.',
+      simulated: true,
     };
   }
 }

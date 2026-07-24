@@ -1,20 +1,37 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const money = (n: number) => '$' + Math.round(n).toLocaleString();
 
-type Listing = { acres?: number; price?: number; address?: string; lat?: number; lng?: number; apn?: string; rawData?: any };
+type Listing = {
+  acres?: number;
+  price?: number;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  apn?: string;
+  county?: string;
+  /** Real GIS boundary [lng,lat][] when selected from map */
+  ring?: [number, number][];
+  rawData?: any;
+};
 
 /**
- * Drop-in widget for a land-listing detail page.
- * Shows the buy/pass verdict (fast, acres+price) and can generate an on-parcel
- * intelligent plat from the real GIS parcel geometry.
+ * Drop-in widget for a land-listing detail page or GIS selection.
+ * Shows the buy/pass verdict and generates an on-parcel plat from real GIS geometry when available.
  */
 export default function DevelopmentPotential({ listing }: { listing: Listing }) {
   const [a, setA] = useState<any>(null);
   const [plat, setPlat] = useState<any>(null);
   const [busy, setBusy] = useState<'' | 'analyze' | 'plat'>('');
   const [err, setErr] = useState('');
+
+  // Reset when map selection changes
+  useEffect(() => {
+    setA(null);
+    setPlat(null);
+    setErr('');
+  }, [listing.apn, listing.acres, listing.lat, listing.lng, listing.price]);
 
   async function analyze() {
     setBusy('analyze'); setErr('');
@@ -32,11 +49,27 @@ export default function DevelopmentPotential({ listing }: { listing: Listing }) 
   async function generatePlat() {
     setBusy('plat'); setErr('');
     try {
+      const hasRing = Array.isArray(listing.ring) && listing.ring.length >= 3;
+      const hasPinOrCoords = !!(
+        listing.lat ||
+        listing.rawData?.Latitude ||
+        listing.apn ||
+        listing.rawData?.ParcelNumber
+      );
       const r = await fetch('/api/development/plat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          lat: listing.lat ?? listing.rawData?.Latitude, lng: listing.lng ?? listing.rawData?.Longitude,
-          apn: listing.apn ?? listing.rawData?.ParcelNumber, county: a?.county,
+          lat: listing.lat ?? listing.rawData?.Latitude,
+          lng: listing.lng ?? listing.rawData?.Longitude,
+          apn: listing.apn ?? listing.rawData?.ParcelNumber,
+          county: listing.county || a?.county,
+          acres: listing.acres,
+          price: listing.price,
+          address: listing.address,
+          // Prefer real boundary from map selection
+          ring: hasRing ? listing.ring : undefined,
+          concept: !hasRing && !hasPinOrCoords,
+          withAi: true,
         }),
       });
       const j = await r.json();
@@ -81,9 +114,13 @@ export default function DevelopmentPotential({ listing }: { listing: Listing }) 
       {plat?.svg && (
         <div className="mt-3">
           <div className="text-sm text-slate-600 mb-1">
-            {plat.metrics.lots} lots · {plat.metrics.roadLF.toLocaleString()} LF road · {plat.metrics.acres} ac (from GIS geometry)
+            {plat.metrics.lots} lots · {plat.metrics.roadLF.toLocaleString()} LF road · {plat.metrics.acres} ac
+            {plat.geometrySource ? ` · ${plat.geometrySource}` : ''}
           </div>
-          <div className="rounded border" dangerouslySetInnerHTML={{ __html: plat.svg }} />
+          <div className="rounded border bg-white" dangerouslySetInnerHTML={{ __html: plat.svg }} />
+          {plat.aiInsights && (
+            <p className="text-xs text-slate-600 mt-2 whitespace-pre-wrap border-t pt-2">{plat.aiInsights}</p>
+          )}
         </div>
       )}
     </div>

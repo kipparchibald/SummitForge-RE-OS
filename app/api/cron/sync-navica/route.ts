@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
     console.log('[Cron Navica] Starting background sync...');
 
     // Call the main fetcher (handles live or DEMO automatically)
-    const result = await fetchArchibaldNavicaListings(100);
+    // Full MLS board (all property types), not land-only
+    const result = await fetchArchibaldNavicaListings(200, { landOnly: false });
 
     // Explicitly call save + recent update as requested (idempotent with what fetch already does internally)
     let saved = 0;
@@ -56,21 +57,27 @@ export async function GET(request: NextRequest) {
     // A sync that fetched listings but persisted none is a failure, not a
     // success — reporting 200/success here would hide a broken service-role key
     // or RLS policy behind a green check forever.
-    const persisted = saved > 0 || result.landCount === 0;
+    const persisted = saved > 0 || result.count === 0;
 
     const payload = {
       success: persisted,
       message: persisted
-        ? 'Navica sync completed'
+        ? 'Navica sync completed (full MLS · all property types)'
         : 'Navica sync fetched listings but persisted none — check SUPABASE_SERVICE_ROLE_KEY and RLS policies',
       count: result.count,
       landCount: result.landCount,
+      byType: result.byType,
       saved,
       ...(persistError ? { persistError } : {}),
       source: result.source,
       lastSync: result.lastSync,
       demo: result.source.toLowerCase().includes('demo'),
-      listingsSample: result.listings.slice(0, 3).map(l => ({ address: l.address, acres: l.acres, price: l.price })),
+      listingsSample: result.listings.slice(0, 5).map((l) => ({
+        address: l.address,
+        acres: l.acres,
+        price: l.price,
+        propertyType: l.propertyType,
+      })),
     };
 
     console.log('[Cron Navica] Sync result:', {

@@ -84,14 +84,21 @@ export default function TransactionsPage() {
     setFormResult(result);
   };
 
+  const openCount = transactions.filter((t) => t.status !== 'closed').length;
+
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b px-8 py-5 flex items-center justify-between">
+      <header className="bg-white border-b px-6 sm:px-8 py-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Transaction Coordinator</h1>
-          <p className="text-sm text-gray-500">Track deals, generate Idaho forms, AI-assisted workflow</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Transaction Coordinator</h1>
+          <p className="text-sm text-gray-500">
+            Track deals, generate Idaho forms · {openCount} open
+            {' · '}
+            <a href="/crm" className="text-sky-700 hover:underline">CRM pipeline</a>
+          </p>
         </div>
         <button
+          type="button"
           onClick={createNew}
           className="px-4 py-2 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800"
         >
@@ -99,11 +106,11 @@ export default function TransactionsPage() {
         </button>
       </header>
 
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* List */}
         <div className="lg:col-span-1 space-y-3">
-          <div className="bg-white border rounded-3xl p-4 space-y-3">
-            <div className="text-sm font-medium text-gray-700">Quick Create</div>
+          <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
+            <div className="text-sm font-medium text-gray-700">Quick create</div>
             <input
               className="w-full border rounded-xl px-3 py-2 text-sm"
               placeholder="Address"
@@ -116,11 +123,19 @@ export default function TransactionsPage() {
               value={newPrice}
               onChange={e => setNewPrice(e.target.value)}
             />
+            <button
+              type="button"
+              onClick={createNew}
+              className="w-full py-2 text-sm rounded-xl border hover:bg-gray-50"
+            >
+              Create deal
+            </button>
           </div>
 
           {transactions.length === 0 && (
-            <div className="text-center py-12 text-gray-400 border border-dashed rounded-3xl">
-              No open transactions yet
+            <div className="text-center py-12 text-gray-400 border border-dashed rounded-3xl text-sm">
+              <div className="font-medium text-gray-500 mb-1">No open transactions yet</div>
+              Create a deal above or qualify a lead in CRM first.
             </div>
           )}
 

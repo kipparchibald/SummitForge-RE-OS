@@ -85,10 +85,21 @@ export function calculateInvestmentProForma(property: any, type: 'multifamily' |
  */
 export function calculateLandFeasibility(
   listing: any,
-  assumptions: { lotPrice?: number; county?: string } = {}
+  assumptions: {
+    lotPrice?: number;
+    county?: string;
+    scenario?: string;
+    lots?: number;
+    roadLF?: number;
+  } = {}
 ): LandAnalysis | null {
   return analyzeListing(
-    { acres: listing?.acres, price: listing?.price ?? listing?.listPrice, address: listing?.address, rawData: listing?.rawData },
+    {
+      acres: listing?.acres,
+      price: listing?.price ?? listing?.listPrice,
+      address: listing?.address,
+      rawData: listing?.rawData,
+    },
     assumptions
   );
 }

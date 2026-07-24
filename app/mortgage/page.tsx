@@ -30,7 +30,7 @@ export default function MortgageCalculator() {
       setTotalPayment(Math.round(total));
       setTotalInterest(Math.round(interest));
     }
-  }, [loanAmount, downPayment, interestRate, loanTerm]);
+  }, [principal, interestRate, loanTerm]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

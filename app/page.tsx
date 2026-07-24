@@ -1,20 +1,40 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import RecentMatches from '@/components/RecentMatches';
 import { getAlerts, getMatches, isSupabaseConfigured } from '@/lib/alerts/supabase-store';
 import { applyBrandTokens, DEFAULT_BRAND } from '@/lib/theme/tokens';
+
+function greetingForHour(hour: number): string {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function openTransactionCount(): number {
+  try {
+    const raw = localStorage.getItem('sf_transactions');
+    if (!raw) return 0;
+    const list = JSON.parse(raw) as { status?: string }[];
+    return list.filter((t) => t.status && t.status !== 'closed').length;
+  } catch {
+    return 0;
+  }
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
     activeAlerts: 0,
     totalMatches: 0,
     unreadMatches: 0,
+    openTransactions: 0,
   });
   const [storeMode, setStoreMode] = useState<'local' | 'supabase'>('local');
   const [health, setHealth] = useState<any>(null);
   const [autoImportEnabled, setAutoImportEnabled] = useState(false);
+  const [greeting, setGreeting] = useState('Welcome');
+  const [clock, setClock] = useState('');
 
   useEffect(() => {
     try {
@@ -28,6 +48,28 @@ export default function DashboardPage() {
       setStoreMode('local');
     }
 
+    try {
+      setAutoImportEnabled(localStorage.getItem('sf_auto_import') === '1');
+    } catch {
+      /* ignore */
+    }
+
+    const tick = () => {
+      const now = new Date();
+      setGreeting(greetingForHour(now.getHours()));
+      setClock(
+        now.toLocaleString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      );
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+
     (async () => {
       try {
         const alerts = await getAlerts('user_kipp');
@@ -36,9 +78,10 @@ export default function DashboardPage() {
           activeAlerts: alerts.filter((a: { active: boolean }) => a.active).length,
           totalMatches: matches.length,
           unreadMatches: matches.filter((m: { notified?: boolean }) => !m.notified).length,
+          openTransactions: openTransactionCount(),
         });
       } catch {
-        /* offline demo */
+        setStats((s) => ({ ...s, openTransactions: openTransactionCount() }));
       }
     })();
 
@@ -46,35 +89,60 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then(setHealth)
       .catch(() => setHealth(null));
+
+    return () => clearInterval(id);
   }, []);
 
-  const toggleAutoImport = () => setAutoImportEnabled(!autoImportEnabled);
+  const toggleAutoImport = () => {
+    setAutoImportEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sf_auto_import', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const navicaConfigured = health?.navica?.configured;
   const schemaOk = health?.supabase?.schemaOk;
+  const healthMode = health?.mode === 'demo' ? 'Demo' : health?.mode === 'production' ? 'Live' : '—';
+
+  const statusItems = useMemo(
+    () => [
+      { label: 'Matching Engine', status: 'ready' as const },
+      { label: 'SMS Notifications', status: 'ready' as const },
+      {
+        label: 'Supabase',
+        status: (storeMode === 'supabase' ? 'ready' : 'optional') as 'ready' | 'optional',
+      },
+      {
+        label: 'Navica Feed',
+        status: (navicaConfigured ? 'ready' : 'optional') as 'ready' | 'optional',
+      },
+      {
+        label: 'Schema (visibility)',
+        status: (schemaOk === false ? 'todo' : schemaOk ? 'ready' : 'optional') as
+          | 'ready'
+          | 'optional'
+          | 'todo',
+      },
+      { label: 'Idaho Forms', status: 'ready' as const },
+      { label: 'GIS Monitor', status: 'ready' as const },
+      { label: 'Land Engine', status: 'ready' as const },
+    ],
+    [storeMode, navicaConfigured, schemaOk]
+  );
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-20">
-        <div className="px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center font-bold text-lg">
-              SF
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">SummitForge Command Center</h1>
-              <p className="text-sm text-zinc-400">
-                Archibald-Bagley · Jefferson County / Eastern Idaho
-                <span className="ml-2 text-xs text-zinc-500">
-                  ({storeMode === 'supabase' ? 'Supabase' : 'Local'} store)
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap justify-end">
+    <div className="min-h-[calc(100vh-60px)] bg-zinc-950 text-white -mt-0">
+      <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
+        {/* Status strip (no second app chrome — shell already provides nav) */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border ${
                 navicaConfigured
                   ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
                   : 'bg-zinc-900 text-zinc-400 border-zinc-700'
@@ -87,10 +155,9 @@ export default function DashboardPage() {
               />
               {navicaConfigured ? 'Navica Live' : 'Navica Demo'}
             </span>
-
             {health && (
               <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border ${
                   schemaOk
                     ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900'
                     : 'bg-amber-950/40 text-amber-400 border-amber-900'
@@ -99,10 +166,21 @@ export default function DashboardPage() {
                 Schema {schemaOk ? 'OK' : 'Needs Migration'}
               </span>
             )}
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full font-medium border border-zinc-800 bg-zinc-900 text-zinc-400">
+              {storeMode === 'supabase' ? 'Supabase' : 'Local'} store · {healthMode}
+            </span>
+            {clock && (
+              <span className="hidden sm:inline text-zinc-600 px-2">{clock}</span>
+            )}
+          </div>
 
+          <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-2xl px-3 py-1.5">
               <span className="text-xs text-zinc-400 mr-2">Auto-Import</span>
               <button
+                type="button"
+                role="switch"
+                aria-checked={autoImportEnabled}
                 onClick={toggleAutoImport}
                 className={`relative w-10 h-5 rounded-full transition ${
                   autoImportEnabled ? 'bg-emerald-600' : 'bg-zinc-700'
@@ -115,7 +193,6 @@ export default function DashboardPage() {
                 />
               </button>
             </div>
-
             <Link
               href="/alerts"
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-xl transition"
@@ -124,34 +201,40 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
-      </header>
 
-      <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div>
-            <h2 className="text-3xl lg:text-4xl font-semibold tracking-tight">Good evening, Kipp</h2>
+            <h2 className="text-3xl lg:text-4xl font-semibold tracking-tight">
+              {greeting}, Kipp
+            </h2>
             <p className="text-zinc-400 mt-1">
               Land deals · Alerts · Transactions · GIS — one command center for Eastern Idaho.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/monitoring"
+              href="/development/plat"
               className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 font-medium transition"
+            >
+              AI Plat Studio
+            </Link>
+            <Link
+              href="/monitoring"
+              className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
             >
               GIS Monitoring
             </Link>
             <Link
-              href="/development/land-deals"
+              href="/crm"
               className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
             >
-              Land Deals Engine
+              CRM Pipeline
             </Link>
             <Link
-              href="/import"
+              href="/cma"
               className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
             >
-              Pull Navica
+              CMA Builder
             </Link>
           </div>
         </div>
@@ -160,7 +243,12 @@ export default function DashboardPage() {
           <StatCard label="Active Alerts" value={stats.activeAlerts} href="/alerts" accent="emerald" />
           <StatCard label="Total Matches" value={stats.totalMatches} href="/alerts" accent="blue" />
           <StatCard label="Unread Matches" value={stats.unreadMatches} href="/alerts" accent="amber" />
-          <StatCard label="Open Transactions" value={3} href="/transactions" accent="purple" />
+          <StatCard
+            label="Open Transactions"
+            value={stats.openTransactions}
+            href="/transactions"
+            accent="purple"
+          />
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -168,30 +256,38 @@ export default function DashboardPage() {
             <div className="rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 relative overflow-hidden">
               <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-600/40 via-transparent to-transparent" />
               <div className="relative">
-                <p className="text-emerald-400 text-sm font-medium mb-1">Jefferson County GIS</p>
-                <h3 className="text-2xl font-semibold">Monitor parcels · Run pro-formas · Draw plats</h3>
+                <p className="text-emerald-400 text-sm font-medium mb-1">AI Plat · GIS · CRM · CMA</p>
+                <h3 className="text-2xl font-semibold">
+                  Plat land · Score deals · Run CMAs · Work the pipeline
+                </h3>
                 <p className="text-zinc-400 mt-2 max-w-xl">
-                  Click parcels on the map, score raw land feasibility, and generate entitlement-ready
-                  development packets for Rigby, Ririe, and surrounding counties.
+                  Flagship tools for Eastern Idaho brokerage: intelligent plats, land Offer/Pass,
+                  GIS monitoring, agent CRM, and adjusted comps — all on Navica-ready data.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link
-                    href="/monitoring"
+                    href="/development/plat"
                     className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-medium transition"
                   >
-                    Open GIS Map
+                    Open AI Plat Studio
                   </Link>
                   <Link
-                    href="/development/land-deals"
+                    href="/monitoring"
                     className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm font-medium transition"
                   >
-                    Land Feasibility
+                    GIS Map
                   </Link>
                   <Link
-                    href="/reports/land-analysis"
+                    href="/crm"
                     className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm font-medium transition"
                   >
-                    Land Reports
+                    CRM
+                  </Link>
+                  <Link
+                    href="/cma"
+                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm font-medium transition"
+                  >
+                    CMA
                   </Link>
                 </div>
               </div>
@@ -205,7 +301,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
               <div className="rounded-3xl border border-zinc-800 bg-zinc-900/50 overflow-hidden">
-                <RecentMatches limit={8} />
+                <RecentMatches limit={8} variant="dark" />
               </div>
             </div>
           </div>
@@ -214,31 +310,26 @@ export default function DashboardPage() {
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5">
               <h3 className="font-semibold mb-4">Quick Actions</h3>
               <div className="space-y-1">
-                <QuickLink href="/import" label="Import / Navica Pull" desc="Live IDX + CSV + matching" />
-                <QuickLink href="/transactions" label="Transaction Coordinator" desc="Deals, timelines, Idaho forms" />
-                <QuickLink href="/forms" label="Idaho Forms + E-Sign" desc="RE-21, RE-14, disclosures" />
+                <QuickLink href="/development/plat" label="AI Plat Studio" desc="Feasibility + intelligent lot layout" />
+                <QuickLink href="/development/land-deals" label="Land Deals Engine" desc="Offer/Pass pipeline scores" />
+                <QuickLink href="/monitoring" label="GIS Monitoring" desc="Map parcels · pro formas" />
+                <QuickLink href="/crm" label="CRM Pipeline" desc="Leads, nurture, AI qualify" />
+                <QuickLink href="/cma" label="CMA Builder" desc="Adjusted comps + AI value" />
                 <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe trends & forecast" />
+                <QuickLink href="/import" label="Import / Navica Pull" desc="Live IDX + CSV + matching" />
+                <QuickLink href="/marketing" label="Marketing Agent" desc="Build · approve · deploy campaigns" />
                 <QuickLink href="/ai-assistants" label="AI Assistants" desc="Valuation, marketing, council" />
+                <QuickLink href="/transactions" label="Transaction Coordinator" desc="Deals, timelines, Idaho forms" />
                 <QuickLink href="/portal" label="Client Portal" desc="Buyer dashboard + voice" />
-                <QuickLink href="/marketing" label="Marketing Agent" desc="Plans & execution" />
-                <QuickLink href="/publish" label="White-Label Publish" desc="Package for other brokerages" />
               </div>
             </div>
 
             <div className="rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5">
               <h3 className="font-semibold mb-4">System Status</h3>
               <div className="space-y-3 text-sm">
-                <StatusRow label="Matching Engine" status="ready" />
-                <StatusRow label="SMS Notifications" status="ready" />
-                <StatusRow label="Supabase" status={storeMode === 'supabase' ? 'ready' : 'optional'} />
-                <StatusRow label="Navica Feed" status={navicaConfigured ? 'ready' : 'optional'} />
-                <StatusRow
-                  label="Schema (visibility)"
-                  status={schemaOk === false ? 'todo' : schemaOk ? 'ready' : 'optional'}
-                />
-                <StatusRow label="Idaho Forms" status="ready" />
-                <StatusRow label="GIS Monitor" status="ready" />
-                <StatusRow label="Land Engine" status="ready" />
+                {statusItems.map((item) => (
+                  <StatusRow key={item.label} label={item.label} status={item.status} />
+                ))}
               </div>
               <Link
                 href="/api/health"

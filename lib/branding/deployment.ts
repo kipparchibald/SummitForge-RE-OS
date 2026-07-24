@@ -55,11 +55,25 @@ export function hasDeploymentBranding(b: DeploymentBranding = deploymentBranding
   return Object.values(b).some(Boolean);
 }
 
-/** Inline CSS vars for the server-rendered <html>, so first paint is branded. */
+/**
+ * Inline CSS vars for the server-rendered <html>, so first paint is branded.
+ * Prefer deploymentBrandCssText() + a <style> tag so React does not reconcile
+ * html[style] against a pre-hydration localStorage theme script.
+ */
 export function deploymentBrandStyle(b: DeploymentBranding = deploymentBranding()): Record<string, string> {
   const style: Record<string, string> = {};
   if (b.primaryColor) style['--primary'] = b.primaryColor;
   if (b.secondaryColor) style['--secondary'] = b.secondaryColor;
   if (b.accentColor) style['--accent'] = b.accentColor;
   return style;
+}
+
+/** CSS text for :root — safe for a static <style> tag (no React style prop on <html>). */
+export function deploymentBrandCssText(b: DeploymentBranding = deploymentBranding()): string {
+  const decls: string[] = [];
+  if (b.primaryColor) decls.push(`--primary: ${b.primaryColor}`);
+  if (b.secondaryColor) decls.push(`--secondary: ${b.secondaryColor}`);
+  if (b.accentColor) decls.push(`--accent: ${b.accentColor}`);
+  if (decls.length === 0) return '';
+  return `:root{${decls.join(';')}}`;
 }
