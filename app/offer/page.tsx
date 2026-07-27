@@ -23,20 +23,27 @@ function winTone(p: number): 'success' | 'warning' | 'danger' | 'info' {
   return 'danger';
 }
 
-function propertyFromParams(sp: URLSearchParams | null): OfferProperty | null {
+function propertyFromParams(sp: URLSearchParams | null): {
+  property: OfferProperty;
+  suggestedOffer?: number;
+} | null {
   if (!sp) return null;
   const address = sp.get('address');
   const price = Number(sp.get('price') || 0);
   if (!address || !price) return null;
+  const indicated = Number(sp.get('indicated') || 0) || undefined;
   return {
-    address,
-    listPrice: price,
-    sqft: Number(sp.get('sqft') || 0) || undefined,
-    acres: Number(sp.get('acres') || 0) || undefined,
-    isLand: sp.get('land') === '1',
-    daysOnMarket: Number(sp.get('dom') || 0) || 14,
-    city: /ririe/i.test(address) ? 'Ririe' : 'Rigby',
-    propertyType: sp.get('land') === '1' ? 'Land' : 'Single Family',
+    property: {
+      address,
+      listPrice: price,
+      sqft: Number(sp.get('sqft') || 0) || undefined,
+      acres: Number(sp.get('acres') || 0) || undefined,
+      isLand: sp.get('land') === '1',
+      daysOnMarket: Number(sp.get('dom') || 0) || 14,
+      city: /ririe/i.test(address) ? 'Ririe' : 'Rigby',
+      propertyType: sp.get('land') === '1' ? 'Land' : 'Single Family',
+    },
+    suggestedOffer: indicated && indicated > 0 ? indicated : undefined,
   };
 }
 
@@ -55,15 +62,19 @@ function OfferDecisionInner() {
     String(Math.round(DEMO_PROPERTIES[0].listPrice * 1.03))
   );
   const [fromLink, setFromLink] = useState(false);
+  const [cmaHint, setCmaHint] = useState<number | null>(null);
 
   useEffect(() => {
     const fromQ = propertyFromParams(searchParams);
     if (fromQ) {
-      setProperty(fromQ);
-      setOfferPrice(String(fromQ.listPrice));
-      setEarnest(String(Math.round(fromQ.listPrice * 0.02)));
-      setEscalationMax(String(Math.round(fromQ.listPrice * 1.03)));
+      const { property: p, suggestedOffer } = fromQ;
+      setProperty(p);
+      const start = suggestedOffer || p.listPrice;
+      setOfferPrice(String(start));
+      setEarnest(String(Math.round(start * 0.02)));
+      setEscalationMax(String(Math.round(p.listPrice * 1.03)));
       setFromLink(true);
+      setCmaHint(suggestedOffer || null);
     }
   }, [searchParams]);
 
@@ -90,6 +101,7 @@ function OfferDecisionInner() {
     setEarnest(String(Math.round(p.listPrice * 0.02)));
     setEscalationMax(String(Math.round(p.listPrice * 1.03)));
     setFromLink(false);
+    setCmaHint(null);
   };
 
   const applyRecommended = () => {
@@ -104,6 +116,7 @@ function OfferDecisionInner() {
       `OFFER DECISION BRIEF — ${property.address}`,
       `List: ${money(property.listPrice)} · Offer: ${money(terms.offerPrice)} (${Math.round(decision.pctOfList * 100)}% of list)`,
       `Win probability: ${decision.winProbability}% (${decision.confidence} confidence)`,
+      cmaHint ? `CMA indicated value used as starting point: ${money(cmaHint)}` : '',
       ``,
       decision.narrative,
       ``,
@@ -153,7 +166,8 @@ function OfferDecisionInner() {
 
         {fromLink && (
           <div className="rounded-xl border border-emerald-900 bg-emerald-950/40 px-4 py-2.5 text-sm text-emerald-200">
-            Loaded from match / listing / CMA link — tune terms below and copy the brief for your client.
+            Loaded from match / listing / CMA link
+            {cmaHint ? ` · starting offer set to CMA indicated ${money(cmaHint)}` : ''} — tune terms and copy the brief.
           </div>
         )}
 
