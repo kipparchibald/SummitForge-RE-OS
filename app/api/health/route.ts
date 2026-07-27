@@ -7,8 +7,6 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Lightweight health / readiness endpoint for SummitForge.
- * Useful for smoke tests, Vercel monitoring, and diagnosing Navica/Supabase issues.
- *
  * GET /api/health
  */
 export async function GET() {
@@ -19,6 +17,12 @@ export async function GET() {
   const cronSecretSet = !!process.env.CRON_SECRET;
   const supabaseLive = isSupabaseLive();
   const ai = aiStatus();
+
+  const twilioConfigured = !!(
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    process.env.TWILIO_FROM_NUMBER
+  );
 
   const status = {
     ok: schema.ok,
@@ -44,7 +48,13 @@ export async function GET() {
       configured: navicaConfigured,
       note: navicaConfigured
         ? 'Live credentials present — fetchArchibaldNavicaListings will hit the real feed'
-        : 'No credentials — using high-quality Eastern Idaho demo land data',
+        : 'No credentials — using high-quality Eastern Idaho demo MLS board',
+    },
+    twilio: {
+      configured: twilioConfigured,
+      note: twilioConfigured
+        ? 'Live SMS via /api/nurture/send-sms'
+        : 'Simulated SMS — set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER',
     },
     cron: {
       secretConfigured: cronSecretSet,
