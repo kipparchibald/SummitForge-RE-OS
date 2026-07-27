@@ -9,6 +9,7 @@ import {
   renderTemplate,
 } from '@/lib/nurture/sequences';
 import { loadContacts, type CrmContact } from '@/lib/crm/store';
+import { nurtureBrandContext } from '@/lib/nurture/brand';
 
 /** MoxiWorks-style nurture enrollment + preview for agent CRM. */
 export default function NurturePanel() {
@@ -25,6 +26,7 @@ export default function NurturePanel() {
 
   const seq = NURTURE_SEQUENCES.find((s) => s.id === selectedSeq);
   const contact = contacts.find((c) => c.id === selectedContact);
+  const brand = nurtureBrandContext();
 
   const onEnroll = () => {
     if (!selectedContact || !selectedSeq) return;
@@ -38,7 +40,7 @@ export default function NurturePanel() {
     seq && contact
       ? renderTemplate(seq.steps[0]?.body || '', {
           name: contact.name,
-          agent: 'Kipp Archibald',
+          agent: brand.agent,
           area: contact.areas?.[0] || 'Eastern Idaho',
           budget: contact.budget,
           interest: contact.interest,
@@ -49,9 +51,7 @@ export default function NurturePanel() {
     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div>
         <h3 className="font-semibold text-zinc-900">Automated nurture</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          SMS-first drips · like MoxiWorks / Compass stay-in-touch
-        </p>
+        <p className="text-xs text-zinc-500 mt-0.5">SMS-first drips · {brand.brokerage}</p>
       </div>
 
       <label className="block text-xs text-zinc-500">
