@@ -59,10 +59,8 @@ export default function RecentMatches({
         variant={dark ? 'dark' : 'light'}
         title="No matches yet"
         description="Import a Navica CSV or create alerts. Matches appear here automatically."
-        action={{
-          label: 'Open Offer Engine',
-          href: '/offer',
-        }}
+        actionLabel="Open Offer Engine"
+        actionHref="/offer"
       />
     );
   }
