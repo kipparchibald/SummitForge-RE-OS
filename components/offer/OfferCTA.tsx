@@ -6,6 +6,8 @@ import Link from 'next/link';
 export function buildOfferHref(opts?: {
   address?: string;
   price?: number;
+  /** CMA indicated / suggested offer — preferred as starting offer price */
+  indicated?: number;
   sqft?: number;
   acres?: number;
   isLand?: boolean;
@@ -13,6 +15,9 @@ export function buildOfferHref(opts?: {
   const q = new URLSearchParams();
   if (opts?.address) q.set('address', opts.address);
   if (opts?.price != null && opts.price > 0) q.set('price', String(Math.round(opts.price)));
+  if (opts?.indicated != null && opts.indicated > 0) {
+    q.set('indicated', String(Math.round(opts.indicated)));
+  }
   if (opts?.sqft != null && opts.sqft > 0) q.set('sqft', String(Math.round(opts.sqft)));
   if (opts?.acres != null && opts.acres > 0) q.set('acres', String(opts.acres));
   if (opts?.isLand) q.set('land', '1');
@@ -23,6 +28,7 @@ export function buildOfferHref(opts?: {
 export default function OfferCTA({
   address,
   price,
+  indicated,
   sqft,
   acres,
   isLand,
@@ -31,13 +37,14 @@ export default function OfferCTA({
 }: {
   address?: string;
   price?: number;
+  indicated?: number;
   sqft?: number;
   acres?: number;
   isLand?: boolean;
   variant?: 'button' | 'link' | 'chip';
   className?: string;
 }) {
-  const href = buildOfferHref({ address, price, sqft, acres, isLand });
+  const href = buildOfferHref({ address, price, indicated, sqft, acres, isLand });
 
   if (variant === 'chip') {
     return (

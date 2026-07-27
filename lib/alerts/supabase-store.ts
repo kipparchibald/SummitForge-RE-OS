@@ -14,6 +14,7 @@ import {
   addListings as localAddListings,
   markMatchNotified as localMarkNotified,
 } from './store';
+import { withDemoMatchesIfEmpty } from './demo-seed';
 
 let supabase: SupabaseClient | null = null;
 
@@ -41,7 +42,6 @@ export async function getAlerts(userId?: string): Promise<Alert[]> {
       const { data, error } = await q;
       if (!error && data && data.length > 0) {
         const alerts = data.map(rowToAlert);
-        // keep local in sync
         localSaveAlerts(alerts);
         return alerts;
       }
@@ -54,7 +54,7 @@ export async function getAlerts(userId?: string): Promise<Alert[]> {
 
 export async function saveAlert(alert: Alert): Promise<void> {
   const existing = localGetAlerts();
-  const idx = existing.findIndex(a => a.id === alert.id);
+  const idx = existing.findIndex((a) => a.id === alert.id);
   if (idx >= 0) existing[idx] = alert;
   else existing.unshift(alert);
   localSaveAlerts(existing);
@@ -97,7 +97,8 @@ export async function getMatches(limit = 50): Promise<AlertMatch[]> {
       console.warn('[supabase-store] getMatches failed, falling back', e);
     }
   }
-  return localGetMatches().slice(0, limit);
+  const local = localGetMatches().slice(0, limit);
+  return withDemoMatchesIfEmpty(local).slice(0, limit);
 }
 
 export async function addMatches(matches: AlertMatch[]): Promise<void> {
@@ -131,10 +132,8 @@ export async function getListings(): Promise<Listing[]> {
 
 export async function addListings(listings: Listing[]): Promise<void> {
   localAddListings(listings);
-  // Future: upsert into listings table when Supabase ready
 }
 
-// Helpers
 function rowToAlert(row: any): Alert {
   return {
     id: row.id,

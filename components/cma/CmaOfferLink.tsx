@@ -2,7 +2,7 @@
 
 import OfferCTA from '@/components/offer/OfferCTA';
 
-/** Bridge CMA subject → Offer Decision Engine. */
+/** Bridge CMA subject → Offer Decision Engine (list + indicated value). */
 export default function CmaOfferLink({
   address,
   listPrice,
@@ -20,12 +20,14 @@ export default function CmaOfferLink({
 }) {
   const price = listPrice || indicatedValue || 0;
   if (!address || !price) return null;
-  const isLand = /land|farm|ranch|vacant/i.test(propertyType || '') || (!!acres && acres >= 1 && !sqft);
+  const isLand =
+    /land|farm|ranch|vacant/i.test(propertyType || '') || (!!acres && acres >= 1 && !sqft);
 
   return (
     <OfferCTA
       address={address}
-      price={price}
+      price={listPrice || price}
+      indicated={indicatedValue}
       acres={acres}
       sqft={sqft}
       isLand={isLand}
