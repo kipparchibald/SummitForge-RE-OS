@@ -60,10 +60,10 @@ export default function SubjectPresets({
       key={id}
       type="button"
       onClick={() => onSelect({ ...preset })}
-      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
+      className={`px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider border transition ${
         active === id
-          ? 'border-emerald-500 bg-emerald-50 text-emerald-900'
-          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+          ? 'border-neutral-900 bg-neutral-900 text-white'
+          : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-900'
       }`}
     >
       {label}
@@ -72,7 +72,9 @@ export default function SubjectPresets({
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">Demo subject</div>
+      <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-400 font-semibold">
+        Demo subject
+      </div>
       <div className="flex flex-wrap gap-1.5">
         {btn('land', 'Land · 12.5 ac', PRESET_LAND)}
         {btn('home', 'Home · Lindy', PRESET_HOME)}

@@ -18,6 +18,7 @@ import {
   sequencesForStage,
   type NurtureSequence,
 } from '@/lib/nurture/sequences';
+import { toastSuccess, toastInfo } from '@/lib/toast/store';
 
 const money = (n?: number) =>
   n != null
@@ -30,7 +31,6 @@ export default function CrmPage() {
   const [filter, setFilter] = useState<CrmStage | 'all'>('all');
   const [aiReply, setAiReply] = useState('');
   const [busy, setBusy] = useState(false);
-  const [nurtureToast, setNurtureToast] = useState('');
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -87,6 +87,7 @@ export default function CrmPage() {
     persist(list);
     setSelected(c);
     setForm({ name: '', phone: '', email: '', interest: '', budget: '', areas: 'Rigby' });
+    toastSuccess(`Lead added: ${c.name}`);
   };
 
   const update = (id: string, patch: Partial<CrmContact>) => {
@@ -106,8 +107,7 @@ export default function CrmPage() {
       notes: [...selected.notes, `Enrolled in nurture: ${seqName}`],
       stage: selected.stage === 'lead' ? 'nurture' : selected.stage,
     });
-    setNurtureToast(`Enrolled ${selected.name} in “${seqName}”`);
-    setTimeout(() => setNurtureToast(''), 3500);
+    toastSuccess(`Enrolled ${selected.name} in “${seqName}”`);
   };
 
   const qualifyWithAi = async (c: CrmContact) => {
@@ -140,46 +140,56 @@ export default function CrmPage() {
         score: Math.min(99, (c.score || 50) + 15),
         notes: [...c.notes, `AI qualify: ${String(msg).slice(0, 120)}`],
       });
+      toastSuccess(`${c.name} qualified`);
     } catch {
       setAiReply('Lead agent unavailable — contact still saved.');
+      toastInfo('Lead agent unavailable — contact still saved');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto">
-      <div className="page-header flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+    <div className="p-6 sm:p-10 max-w-7xl mx-auto">
+      <div className="page-header flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-6 mb-6 border-b border-neutral-900">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">CRM Pipeline</h1>
-          <p className="text-gray-600 mt-1">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold mb-2">
+            Pipeline
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-medium tracking-tight font-serif text-neutral-900">
+            CRM
+          </h1>
+          <p className="text-neutral-500 mt-2 text-sm max-w-xl leading-relaxed">
             Leads, nurture, showings, and active buyers — linked to alerts, portal, and AI.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/alerts" className="px-3 py-2 rounded-xl border hover:bg-gray-50">
-            Property Alerts
+          <Link
+            href="/alerts"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 hover:border-neutral-900"
+          >
+            Alerts
           </Link>
-          <Link href="/transactions" className="px-3 py-2 rounded-xl border hover:bg-gray-50">
+          <Link
+            href="/transactions"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 hover:border-neutral-900"
+          >
             Transactions
           </Link>
-          <Link href="/portal" className="px-3 py-2 rounded-xl border hover:bg-gray-50">
-            Client Portal
+          <Link
+            href="/portal"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 hover:border-neutral-900"
+          >
+            Portal
           </Link>
           <Link
             href="/ai-assistants"
-            className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold bg-neutral-900 text-white hover:bg-black"
           >
             AI Assistants
           </Link>
         </div>
       </div>
-
-      {nurtureToast && (
-        <div className="mb-4 text-sm px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
-          {nurtureToast}
-        </div>
-      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <Kpi label="Open pipeline" value={String(openPipeline)} />

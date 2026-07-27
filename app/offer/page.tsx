@@ -341,8 +341,17 @@ function OfferDecisionInner() {
               <button type="button" onClick={copyBrief} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-medium">
                 Copy decision brief
               </button>
+              <Link
+                href={`/mortgage?price=${Math.round(decision.offerPrice)}&down=20&term=30`}
+                className="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm"
+              >
+                Estimate payment →
+              </Link>
               <Link href="/transactions" className="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm">
                 Open transaction file
+              </Link>
+              <Link href="/cma" className="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm">
+                CMA Builder
               </Link>
             </div>
           </div>

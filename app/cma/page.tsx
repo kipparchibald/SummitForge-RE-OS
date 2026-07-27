@@ -379,11 +379,19 @@ export default function CMABuilder() {
                   <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-neutral-800">
                     Adjusted comparables
                   </span>
-                  <ExportCmaButton
-                    result={result}
-                    label="Export PDF"
-                    className="px-3 py-2 bg-neutral-900 text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-black"
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/mortgage?price=${Math.round(result.indicatedValue)}&down=20&term=30`}
+                      className="px-3 py-2 border border-neutral-300 text-neutral-800 text-[10px] font-semibold uppercase tracking-wider hover:border-neutral-900"
+                    >
+                      Payment
+                    </Link>
+                    <ExportCmaButton
+                      result={result}
+                      label="Export PDF"
+                      className="px-3 py-2 bg-neutral-900 text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-black"
+                    />
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">

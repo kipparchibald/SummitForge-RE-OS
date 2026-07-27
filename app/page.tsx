@@ -197,11 +197,14 @@ export default function DashboardPage() {
 
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
           <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-semibold mb-2">
+              Voxli.dev · Command
+            </p>
             <h2 className="text-3xl lg:text-4xl font-semibold tracking-tight">
               {greeting}, Kipp
             </h2>
             <p className="text-zinc-400 mt-1">
-              Land deals · Alerts · Transactions · GIS — one command center for Eastern Idaho.
+              Land · GIS · CMA · Offers · Pipeline — one command center for Eastern Idaho.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -215,19 +218,25 @@ export default function DashboardPage() {
               href="/monitoring"
               className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
             >
-              GIS Monitoring
-            </Link>
-            <Link
-              href="/crm"
-              className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
-            >
-              CRM Pipeline
+              GIS Map
             </Link>
             <Link
               href="/cma"
               className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
             >
-              CMA Builder
+              CMA
+            </Link>
+            <Link
+              href="/offer"
+              className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
+            >
+              Offer Engine
+            </Link>
+            <Link
+              href="/crm"
+              className="px-5 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium transition"
+            >
+              CRM
             </Link>
           </div>
         </div>
@@ -307,7 +316,9 @@ export default function DashboardPage() {
                 <QuickLink href="/development/land-deals" label="Land Deals Engine" desc="Offer/Pass pipeline scores" />
                 <QuickLink href="/monitoring" label="GIS Monitoring" desc="Map parcels · pro formas" />
                 <QuickLink href="/crm" label="CRM Pipeline" desc="Leads, nurture, AI qualify" />
-                <QuickLink href="/cma" label="CMA Builder" desc="Adjusted comps + AI value" />
+                <QuickLink href="/cma" label="CMA Builder" desc="Adjusted comps + export PDF" />
+                <QuickLink href="/offer" label="Offer Engine" desc="Win probability + terms score" />
+                <QuickLink href="/mortgage" label="Payment estimator" desc="PITI · taxes · PMI planning" />
                 <QuickLink href="/analytics" label="Market Analytics" desc="Rigby / Ririe trends & forecast" />
                 <QuickLink href="/import" label="Import / Navica Pull" desc="Live IDX + CSV + matching" />
                 <QuickLink href="/marketing" label="Marketing Agent" desc="Build · approve · deploy campaigns" />
