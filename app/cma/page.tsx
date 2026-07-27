@@ -12,20 +12,25 @@ import {
 import ParcelAerialMap from '@/components/cma/ParcelAerialMap';
 import ExportCmaButton from '@/components/cma/ExportCmaButton';
 import CmaOfferLink from '@/components/cma/CmaOfferLink';
+import CmaResultStats from '@/components/cma/CmaResultStats';
 
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
+/** Demo pool includes closed sales with soldDate so time adjustment runs offline. */
 const DEMO_COMPS: CompProperty[] = [
-  { address: '4500 E Sunnyside, Idaho Falls, ID', price: 2350000, acres: 47.3, propertyType: 'Land', distanceMi: 12, status: 'Active' },
-  { address: 'Sample 40 acres near Terreton, Terreton, ID', price: 620000, acres: 40, propertyType: 'Land', distanceMi: 18, status: 'Active' },
-  { address: '2200 W 7000 S, Rexburg, ID', price: 1450000, acres: 28.5, propertyType: 'Land', distanceMi: 22, status: 'Active' },
+  { address: '4500 E Sunnyside, Idaho Falls, ID', price: 2350000, acres: 47.3, propertyType: 'Land', distanceMi: 12, status: 'Sold', soldDate: '2025-11-12' },
+  { address: 'Sample 40 acres near Terreton, Terreton, ID', price: 620000, acres: 40, propertyType: 'Land', distanceMi: 18, status: 'Sold', soldDate: '2026-01-20' },
+  { address: '2200 W 7000 S, Rexburg, ID', price: 1450000, acres: 28.5, propertyType: 'Land', distanceMi: 22, status: 'Sold', soldDate: '2025-09-05' },
   { address: '155 Snake River Rd, Swan Valley, ID', price: 1180000, acres: 22, propertyType: 'Land', distanceMi: 28, status: 'Active' },
-  { address: '769 1580 N, Shelley, ID', price: 575000, acres: 5.8, propertyType: 'Land', distanceMi: 14, status: 'Active' },
+  { address: '769 1580 N, Shelley, ID', price: 575000, acres: 5.8, propertyType: 'Land', distanceMi: 14, status: 'Sold', soldDate: '2026-03-01' },
+  { address: '412 Birch St, Rigby, ID', price: 465000, sqft: 1720, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 1.5, status: 'Sold', soldDate: '2026-05-12' },
+  { address: '88 Cottonwood Ln, Rigby, ID', price: 492000, sqft: 1850, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 2.0, status: 'Sold', soldDate: '2026-06-02' },
+  { address: '201 Falcon Dr, Rigby, ID', price: 438000, sqft: 1620, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 2.4, status: 'Sold', soldDate: '2026-04-20' },
   { address: '789 Lindy Lane, Rigby, ID', price: 489000, sqft: 1680, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 1.2, status: 'Pending' },
-  { address: '172 Kiana Dr, Rigby, ID', price: 512000, sqft: 1850, beds: 4, baths: 2.5, propertyType: 'Single Family', distanceMi: 2.1, status: 'Coming Soon' },
-  { address: '3120 Woodruff Ave, Idaho Falls, ID', price: 425000, sqft: 1920, beds: 4, baths: 2, propertyType: 'Single Family', distanceMi: 3.4, status: 'Active' },
-  { address: '48 N 2nd E, Rexburg, ID', price: 379000, sqft: 1540, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 8.1, status: 'Active' },
+  { address: '172 Kiana Dr, Rigby, ID', price: 512000, sqft: 1850, beds: 4, baths: 2.5, propertyType: 'New Construction', distanceMi: 2.1, status: 'Coming Soon' },
+  { address: '3120 Woodruff Ave, Idaho Falls, ID', price: 425000, sqft: 1920, beds: 4, baths: 2, propertyType: 'Single Family', distanceMi: 3.4, status: 'Sold', soldDate: '2026-02-14' },
+  { address: '48 N 2nd E, Rexburg, ID', price: 379000, sqft: 1540, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 8.1, status: 'Sold', soldDate: '2025-12-08' },
 ];
 
 const DEFAULT_SUBJECT: SubjectProperty = {
@@ -79,7 +84,7 @@ export default function CMABuilder() {
       const data = await res.json();
       const listings = (data.listings || []) as {
         address: string; price: number; acres?: number; propertyType?: string;
-        yearBuilt?: number; beds?: number; baths?: number; sqft?: number;
+        yearBuilt?: number; beds?: number; baths?: number; sqft?: number; soldDate?: string;
       }[];
       if (listings.length) {
         const mapped: CompProperty[] = listings.map((l) => ({
@@ -92,6 +97,7 @@ export default function CMABuilder() {
           propertyType: l.propertyType || 'Land',
           status: 'Active',
           distanceMi: 5 + Math.random() * 20,
+          soldDate: l.soldDate,
         }));
         setComps((prev) => {
           const merged = [...mapped, ...prev];
@@ -116,7 +122,9 @@ export default function CMABuilder() {
 
   const runAnalysis = () => {
     setRan(true);
-    setStatus('CMA calculated with adjusted weighted comps.');
+    setStatus(
+      'CMA run: reconciled mean + median, market $/sqft & $/acre, time adjustment on sold comps.'
+    );
   };
 
   const askAi = async () => {
@@ -181,8 +189,8 @@ export default function CMABuilder() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">CMA Builder</h1>
           <p className="text-gray-600 mt-1">
-            Comparable market analysis for land and homes — pull assessor details from GIS parcel
-            selection, then weight comps and AI valuation.
+            Comparable market analysis for land and homes — reconciled mean/median, market-derived
+            $/sqft & $/acre, and time adjustment on closed sales.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -306,6 +314,9 @@ export default function CMABuilder() {
                 ? 'Residential subject — score favors Single Family comps; add GLA/beds when known.'
                 : 'Land subject — score favors acreage comps. Use GIS Send to CMA for house subjects.'}
             </p>
+            <p className="text-slate-400">
+              Closed sales with dates drive time adjustment; actives still help size/type scoring.
+            </p>
             <Link href="/import" className="text-sky-700 hover:underline">Import more listings →</Link>
           </div>
         </div>
@@ -323,12 +334,7 @@ export default function CMABuilder() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Stat label="Indicated value" value={money(result.indicatedValue)} accent />
-                <Stat label="Range low" value={money(result.low)} />
-                <Stat label="Range high" value={money(result.high)} />
-                <Stat label="Confidence" value={`${Math.round(result.confidence * 100)}%`} />
-              </div>
+              <CmaResultStats result={result} />
 
               <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
                 <div className="px-4 py-3 border-b font-semibold text-sm flex items-center justify-between gap-2">
@@ -354,6 +360,7 @@ export default function CMABuilder() {
                             <div className="text-[11px] text-slate-400">
                               {c.propertyType ? `${c.propertyType} · ` : ''}
                               {c.acres ? `${c.acres} ac` : c.sqft ? `${c.sqft} sqft` : ''}
+                              {c.monthsSinceSale != null ? ` · ${c.monthsSinceSale} mo ago` : ''}
                               {c.adjustments.length ? ` · ${c.adjustments.map((a) => a.label).join(', ')}` : ''}
                             </div>
                           </td>
@@ -396,15 +403,6 @@ function Field({ label, value, onChange, type = 'text' }: { label: string; value
       {label}
       <input type={type} className="mt-1 w-full border rounded-xl px-3 py-2 text-sm text-gray-900" value={value} onChange={(e) => onChange(e.target.value)} />
     </label>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className={`rounded-2xl border p-4 ${accent ? 'border-emerald-200 bg-emerald-50' : 'border-gray-200 bg-white'}`}>
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
-      <div className={`text-lg font-semibold tabular-nums mt-0.5 ${accent ? 'text-emerald-900' : 'text-gray-900'}`}>{value}</div>
-    </div>
   );
 }
 
