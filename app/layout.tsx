@@ -8,6 +8,7 @@ import {
 } from '@/lib/branding/deployment'
 import MobileNav from '@/components/MobileNav'
 import { AppNavLinks } from '@/components/AppNavLinks'
+import GlobalToasts from '@/components/GlobalToasts'
 
 export const metadata = {
   title: 'SummitForge RE OS',
@@ -20,40 +21,27 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Centralized: respects NEXT_PUBLIC_DEMO_MODE (default false = production locked)
   const isDemo = isDemoMode();
   const envStatus = validateEnv();
-  // Per-deployment defaults so a first-time visitor to a tenant's URL sees that
-  // tenant's brand immediately, before any localStorage exists.
   const brand = deploymentBranding();
   const hasEnvBrand = hasDeploymentBranding(brand);
   const brandCss = deploymentBrandCssText(brand);
 
   return (
-    // suppressHydrationWarning: theme/demo attrs + localStorage brand script may
-    // differ from SSR before React attaches (same pattern as next-themes).
     <html lang="en" data-demo={isDemo ? 'on' : 'off'} suppressHydrationWarning>
       <body className="bg-gray-50 min-h-screen" suppressHydrationWarning>
-        {/* Brand tokens as a style tag — NOT html[style] — so React never hydrates
-            a style prop that the FOUC / localStorage script also mutates. */}
         {brandCss ? (
           <style
             id="sf-deployment-brand"
             dangerouslySetInnerHTML={{ __html: brandCss }}
           />
         ) : null}
-        {/*
-          Brand bootstrap:
-          1) Sync: only CSS vars on <html> (prevents flash; html has suppressHydrationWarning)
-          2) After paint: text content, demo flag, live badge (avoids text hydration mismatches)
-        */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
                   var root = document.documentElement;
-                  // --- sync: CSS only (FOUC) ---
                   try {
                     var saved = localStorage.getItem('summitforge_branding');
                     if (saved) {
@@ -64,7 +52,6 @@ export default function RootLayout({
                     }
                   } catch (e) {}
 
-                  // --- after hydration: DOM text + badge ---
                   function applyAfterHydrate() {
                     try {
                       var saved2 = localStorage.getItem('summitforge_branding');
@@ -160,8 +147,6 @@ export default function RootLayout({
                     } catch (e) {}
                   }
 
-                  // Defer past React hydration (setTimeout 0 is enough in practice;
-                  // rAF double-buffer is belt-and-suspenders for slow devices).
                   if (typeof requestAnimationFrame === 'function') {
                     requestAnimationFrame(function() {
                       requestAnimationFrame(applyAfterHydrate);
@@ -175,7 +160,6 @@ export default function RootLayout({
           }}
         />
 
-        {/* Demo Banner - ONLY visible in DEMO. Hidden seamlessly in production. */}
         {isDemo && (
           <div className="demo-banner flex items-center justify-center gap-2 font-medium">
             🚀 <strong>DEMO MODE</strong> — Full access enabled for preview. No limits. Ready for real keys &amp; production.
@@ -185,7 +169,6 @@ export default function RootLayout({
           </div>
         )}
 
-        {/* Env validation warnings (DEMO only, non-blocking) */}
         {isDemo && envStatus.warnings.length > 0 && (
           <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-4 py-1 text-center">
             Env notes: {envStatus.warnings.slice(0, 2).join(' • ')}{envStatus.warnings.length > 2 ? ' …' : ''} (see console or /setup)
@@ -193,7 +176,6 @@ export default function RootLayout({
         )}
 
         <div className="flex min-h-screen">
-          {/* Desktop rail — world-class grouped IA */}
           <aside className="w-[272px] bg-slate-50 border-r border-slate-200/80 hidden lg:flex flex-col sticky top-0 h-screen">
             <div className="px-5 pt-6 pb-4 border-b border-slate-200/80">
               <Link
@@ -226,7 +208,6 @@ export default function RootLayout({
             </div>
           </aside>
 
-          {/* Main */}
           <div className="flex-1 min-w-0 flex flex-col">
             <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur sticky top-0 z-30 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -297,6 +278,8 @@ export default function RootLayout({
             <main className="flex-1 min-h-[calc(100vh-52px)] bg-slate-50/40">{children}</main>
           </div>
         </div>
+
+        <GlobalToasts />
       </body>
     </html>
   )
