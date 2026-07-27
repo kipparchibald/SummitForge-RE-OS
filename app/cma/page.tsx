@@ -187,27 +187,46 @@ export default function CMABuilder() {
   };
 
   return (
-    <div className="p-6 sm:p-8 max-w-6xl mx-auto">
-      <div className="page-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <div className="p-6 sm:p-10 max-w-6xl mx-auto">
+      <div className="page-header flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 pb-6 mb-6 border-b border-neutral-900">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">CMA Builder</h1>
-          <p className="text-gray-600 mt-1">
-            Comparable market analysis for land and homes — reconciled mean/median, market-derived
-            $/sqft & $/acre, and time adjustment on closed sales.
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold mb-2">
+            Valuation
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-medium tracking-tight text-neutral-900 font-serif">
+            Comparative Market Analysis
+          </h1>
+          <p className="text-neutral-500 mt-2 max-w-xl text-sm leading-relaxed">
+            Reconciled comps for land and homes — weighted mean, median, market $/sqft &amp; $/acre,
+            and time adjustment on closed sales.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/monitoring" className="px-4 py-2 text-sm rounded-xl border border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100">
-            Select parcel on GIS →
+          <Link
+            href="/monitoring"
+            className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold border border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white transition"
+          >
+            Select parcel
           </Link>
-          <button type="button" onClick={pullNavicaComps} disabled={loading} className="px-4 py-2 text-sm rounded-xl border hover:bg-gray-50 disabled:opacity-50">
-            Pull Navica comps
+          <button
+            type="button"
+            onClick={pullNavicaComps}
+            disabled={loading}
+            className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 text-neutral-700 hover:border-neutral-900 disabled:opacity-50"
+          >
+            Pull comps
           </button>
-          <Link href="/offer" className="px-4 py-2 text-sm rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100">
-            Offer Engine →
+          <Link
+            href="/offer"
+            className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 text-neutral-700 hover:border-neutral-900"
+          >
+            Offer engine
           </Link>
-          <Link href="/development/plat" className="px-4 py-2 text-sm rounded-xl bg-emerald-600 text-white hover:bg-emerald-500">
-            AI Plat residual →
+          <Link
+            href="/development/plat"
+            className="px-4 py-2.5 text-[11px] uppercase tracking-wider font-semibold bg-neutral-900 text-white hover:bg-black"
+          >
+            AI plat
           </Link>
         </div>
       </div>
@@ -260,8 +279,10 @@ export default function CMABuilder() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
-          <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-3">
-            <div className="text-sm font-semibold text-gray-800">Subject property</div>
+          <div className="bg-white border border-neutral-200 p-5 sm:p-6 space-y-3 shadow-none">
+            <div className="text-[10px] uppercase tracking-[0.16em] font-semibold text-neutral-500">
+              Subject property
+            </div>
             {!gisHandoff && (
               <SubjectPresets subject={subject} onSelect={applyPreset} />
             )}
@@ -292,10 +313,19 @@ export default function CMABuilder() {
                 Living area sqft is not on most county parcel layers — enter GLA if known for better residential adjustments.
               </p>
             )}
-            <button type="button" onClick={runAnalysis} className="w-full py-2.5 bg-black text-white rounded-xl text-sm font-medium hover:bg-gray-900">
+            <button
+              type="button"
+              onClick={runAnalysis}
+              className="w-full py-3 bg-neutral-900 text-white text-[11px] font-semibold uppercase tracking-[0.14em] hover:bg-black"
+            >
               Run CMA
             </button>
-            <button type="button" onClick={askAi} disabled={loading} className="w-full py-2.5 border rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+            <button
+              type="button"
+              onClick={askAi}
+              disabled={loading}
+              className="w-full py-3 border border-neutral-300 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-800 hover:border-neutral-900 disabled:opacity-50"
+            >
               AI valuation assist
             </button>
             {result && (
@@ -329,12 +359,14 @@ export default function CMABuilder() {
 
         <div className="lg:col-span-2 space-y-4">
           {!result ? (
-            <div className="bg-white border border-dashed rounded-3xl p-12 text-center text-gray-400">
-              <div className="text-4xl mb-3">📊</div>
-              <div className="font-medium text-gray-600">Ready when you are</div>
-              <p className="text-sm mt-1 max-w-md mx-auto">
+            <div className="bg-white border border-neutral-200 p-14 text-center">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold mb-3">
+                Results
+              </div>
+              <div className="font-serif text-2xl text-neutral-800 tracking-tight">Ready when you are</div>
+              <p className="text-sm mt-3 max-w-md mx-auto text-neutral-500 leading-relaxed">
                 {gisHandoff
-                  ? 'GIS subject loaded with year built and assessed value. Pull Navica comps if needed, then Run CMA.'
+                  ? 'GIS subject loaded with year built and assessed value. Pull comps if needed, then Run CMA.'
                   : 'Pick a demo subject (Land / Home / NC), or select a parcel on GIS → Send to CMA, then Run CMA.'}
               </p>
             </div>
@@ -342,40 +374,69 @@ export default function CMABuilder() {
             <>
               <CmaResultStats result={result} />
 
-              <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-4 py-3 border-b font-semibold text-sm flex items-center justify-between gap-2">
-                  <span>Adjusted comps</span>
-                  <ExportCmaButton result={result} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-500" />
+              <div className="bg-white border border-neutral-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-neutral-900 flex items-center justify-between gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.16em] font-semibold text-neutral-800">
+                    Adjusted comparables
+                  </span>
+                  <ExportCmaButton
+                    result={result}
+                    label="Export PDF"
+                    className="px-3 py-2 bg-neutral-900 text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-black"
+                  />
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 text-left text-xs text-slate-500">
-                      <tr>
-                        <th className="px-3 py-2">Address</th>
-                        <th className="px-3 py-2 text-right">Sale / list</th>
-                        <th className="px-3 py-2 text-right">Net adj</th>
-                        <th className="px-3 py-2 text-right">Adjusted</th>
-                        <th className="px-3 py-2 text-right">Score</th>
+                    <thead className="text-left">
+                      <tr className="border-b border-neutral-200">
+                        <th className="px-4 py-3 text-[9px] uppercase tracking-[0.14em] text-neutral-400 font-semibold">
+                          Address
+                        </th>
+                        <th className="px-4 py-3 text-right text-[9px] uppercase tracking-[0.14em] text-neutral-400 font-semibold">
+                          Sale / list
+                        </th>
+                        <th className="px-4 py-3 text-right text-[9px] uppercase tracking-[0.14em] text-neutral-400 font-semibold">
+                          Net adj
+                        </th>
+                        <th className="px-4 py-3 text-right text-[9px] uppercase tracking-[0.14em] text-neutral-400 font-semibold">
+                          Adjusted
+                        </th>
+                        <th className="px-4 py-3 text-right text-[9px] uppercase tracking-[0.14em] text-neutral-400 font-semibold">
+                          Score
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {result.comps.map((c, i) => (
-                        <tr key={i} className="border-t">
-                          <td className="px-3 py-2.5">
-                            <div className="font-medium text-slate-800">{c.address}</div>
-                            <div className="text-[11px] text-slate-400">
+                        <tr key={i} className="border-b border-neutral-100 last:border-0">
+                          <td className="px-4 py-3.5">
+                            <div className="font-semibold text-neutral-900">{c.address}</div>
+                            <div className="text-[11px] text-neutral-400 mt-0.5">
                               {c.propertyType ? `${c.propertyType} · ` : ''}
                               {c.acres ? `${c.acres} ac` : c.sqft ? `${c.sqft} sqft` : ''}
                               {c.monthsSinceSale != null ? ` · ${c.monthsSinceSale} mo ago` : ''}
-                              {c.adjustments.length ? ` · ${c.adjustments.map((a) => a.label).join(', ')}` : ''}
+                              {c.adjustments.length
+                                ? ` · ${c.adjustments.map((a) => a.label).join(', ')}`
+                                : ''}
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">{money(c.price)}</td>
-                          <td className={`px-3 py-2.5 text-right tabular-nums ${c.netAdjustment >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                            {c.netAdjustment >= 0 ? '+' : ''}{money(c.netAdjustment)}
+                          <td className="px-4 py-3.5 text-right tabular-nums text-neutral-800">
+                            {money(c.price)}
                           </td>
-                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{money(c.adjustedPrice)}</td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{(c.score * 100).toFixed(0)}%</td>
+                          <td
+                            className={`px-4 py-3.5 text-right tabular-nums ${
+                              c.netAdjustment >= 0 ? 'text-emerald-800' : 'text-rose-700'
+                            }`}
+                          >
+                            {c.netAdjustment >= 0 ? '+' : ''}
+                            {money(c.netAdjustment)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-neutral-900">
+                            {money(c.adjustedPrice)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right tabular-nums text-neutral-400">
+                            {(c.score * 100).toFixed(0)}%
+                          </td>
                         </tr>
                       ))}
                     </tbody>

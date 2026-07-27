@@ -3,6 +3,8 @@
 import React from 'react';
 import StatusDot, { type StatusTone } from './StatusDot';
 
+export type { StatusTone };
+
 const BADGE: Record<
   StatusTone,
   { wrap: string; text: string }

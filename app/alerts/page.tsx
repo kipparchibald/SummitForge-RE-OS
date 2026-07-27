@@ -25,6 +25,21 @@ export default function PropertyAlerts() {
   const [supabaseOn, setSupabaseOn] = useState(false);
   const [rematching, setRematching] = useState(false);
 
+  type NotifyChoice = 'sms' | 'email' | 'both';
+  const notifyChoiceToChannels = (c: NotifyChoice): ('email' | 'sms' | 'in-app')[] => {
+    if (c === 'both') return ['sms', 'email'];
+    if (c === 'email') return ['email'];
+    return ['sms'];
+  };
+  const channelsToNotifyChoice = (channels: ('email' | 'sms' | 'in-app')[] | undefined): NotifyChoice => {
+    const list = channels || [];
+    const hasSms = list.includes('sms');
+    const hasEmail = list.includes('email');
+    if (hasSms && hasEmail) return 'both';
+    if (hasEmail && !hasSms) return 'email';
+    return 'sms';
+  };
+
   const [form, setForm] = useState({
     name: '',
     locations: [] as Location[],
@@ -33,7 +48,7 @@ export default function PropertyAlerts() {
     minAcres: 0.25,
     propertyTypes: ['Single Family', 'New Construction'] as PropertyType[],
     newConstructionOnly: false,
-    notifyBy: 'sms' as 'sms' | 'email' | 'both',
+    notifyBy: 'sms' as NotifyChoice,
     phone: '',
   });
 
@@ -84,10 +99,12 @@ export default function PropertyAlerts() {
       minAcres: form.minAcres || undefined,
       propertyTypes: form.propertyTypes,
       newConstructionOnly: form.newConstructionOnly,
-      notifyBy: form.notifyBy,
+      notifyBy: notifyChoiceToChannels(form.notifyBy),
+      frequency: editingAlert?.frequency || 'instant',
+      userId: editingAlert?.userId || 'local',
+      brokerageId: editingAlert?.brokerageId || 'archibald-bagley',
       phone: form.phone || undefined,
       createdAt: editingAlert?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     } as Alert);
     resetForm();
     setShowForm(false);
@@ -104,7 +121,7 @@ export default function PropertyAlerts() {
       minAcres: alert.minAcres || 0.25,
       propertyTypes: alert.propertyTypes,
       newConstructionOnly: alert.newConstructionOnly,
-      notifyBy: alert.notifyBy,
+      notifyBy: channelsToNotifyChoice(alert.notifyBy),
       phone: alert.phone || '',
     });
     setShowForm(true);
@@ -290,7 +307,13 @@ export default function PropertyAlerts() {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-gray-500">
               Notify by
-              <select className="mt-1 w-full border rounded-xl px-3 py-2 text-sm" value={form.notifyBy} onChange={(e) => setForm((f) => ({ ...f, notifyBy: e.target.value as 'sms' | 'email' | 'both' }))}>
+              <select
+                className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+                value={form.notifyBy}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notifyBy: e.target.value as NotifyChoice }))
+                }
+              >
                 <option value="sms">SMS</option>
                 <option value="email">Email</option>
                 <option value="both">Both</option>
@@ -332,7 +355,10 @@ export default function PropertyAlerts() {
                   {alert.maxPrice ? ` · up to $${alert.maxPrice.toLocaleString()}` : ''}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  Notify: {alert.notifyBy}
+                  Notify:{' '}
+                  {Array.isArray(alert.notifyBy)
+                    ? alert.notifyBy.join(', ')
+                    : String(alert.notifyBy || 'sms')}
                   {alert.phone ? ` · ${alert.phone}` : ''}
                   {alert.newConstructionOnly ? ' · new construction only' : ''}
                 </div>

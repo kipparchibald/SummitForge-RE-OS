@@ -1,6 +1,8 @@
 /**
  * Client-side brand application helpers.
- * Keep in sync with the inline bootstrap in app/layout.tsx.
+ * Colors: also applied pre-paint via layout inline script (CSS vars only).
+ * Text (company / tagline / phone): BrandText / BrandPhone after mount, plus
+ * applyBrandToDocument for legacy [data-*] hooks and live settings preview.
  */
 
 export type BrandPayload = {

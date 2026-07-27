@@ -6,6 +6,14 @@
 //   • Treating STArea as ft² understated acres by ~10.76× (51 ac vs ~552 ac).
 //   • Authoritative display acres = geodesic area of the WGS84 ring, cross-checked vs
 //     STArea(m²) and county ASR_ACRES / GISSQFT when available.
+//
+// TLS note (Jefferson assessor, 2026-07): gisportal.co.jefferson.id.us serves a Let's Encrypt
+// leaf without the YE1 intermediate (openssl verify code 21). Node fetch fails with
+// UNABLE_TO_VERIFY_LEAF_SIGNATURE while curl/browsers may still work. Queries to that host
+// use HTTPS with relaxed leaf verification only for the allowlisted hostname.
+
+import https from 'node:https';
+import { URL as NodeURL } from 'node:url';
 
 const IDWR_REST =
   'https://gis.idwr.idaho.gov/hosting/rest/services/Reference/Parcels/MapServer/0/query';
@@ -23,6 +31,17 @@ const MADISON_REST =
 /** Jefferson County assessor property information (owner, values, zoning). Do NOT pass resultRecordCount — service rejects pagination. */
 const JEFFERSON_PROPERTY_INFO =
   'https://gisportal.co.jefferson.id.us/archost/rest/services/Assessor/Property_Information/MapServer/0/query';
+
+/**
+ * County GIS hosts that present incomplete certificate chains.
+ * Still use HTTPS (encrypted); only leaf/chain verification is relaxed for these hosts.
+ */
+const TLS_INCOMPLETE_CHAIN_HOSTS = new Set(['gisportal.co.jefferson.id.us']);
+
+const GIS_FETCH_HEADERS: Record<string, string> = {
+  Accept: 'application/json',
+  'User-Agent': 'SummitForge-RE-OS/1.0 (parcel-identify)',
+};
 
 const SQ_M_PER_ACRE = 4046.8564224;
 const SQ_FT_PER_ACRE = 43560;
@@ -93,16 +112,116 @@ export interface ParcelHit {
   ownership: OwnershipInfo | null;
 }
 
-async function arcgisQuery(url: string, params: Record<string, string>): Promise<any> {
-  const res = await fetch(`${url}?${new URLSearchParams(params)}`, {
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': 'SummitForge-RE-OS/1.0 (parcel-identify)',
-    },
+function isTlsCertError(err: unknown): boolean {
+  const e = err as { cause?: { code?: string; message?: string }; code?: string; message?: string };
+  const code = e?.cause?.code || e?.code || '';
+  const msg = `${e?.message || ''} ${e?.cause?.message || ''}`;
+  return (
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+    code === 'CERT_UNTRUSTED' ||
+    code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+    code === 'ERR_TLS_CERT_ALTNAME_INVALID' ||
+    /unable to verify the first certificate|certificate/i.test(msg)
+  );
+}
+
+/** Node https GET → JSON (supports relaxed TLS for incomplete-chain county portals). */
+function httpsGetJson(
+  urlStr: string,
+  opts: { rejectUnauthorized: boolean; timeoutMs?: number }
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let url: NodeURL;
+    try {
+      url = new NodeURL(urlStr);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    const req = https.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: `${url.pathname}${url.search}`,
+        method: 'GET',
+        headers: GIS_FETCH_HEADERS,
+        rejectUnauthorized: opts.rejectUnauthorized,
+        timeout: opts.timeoutMs ?? 30000,
+      },
+      (res) => {
+        const status = res.statusCode || 0;
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          if (status < 200 || status >= 300) {
+            reject(new Error(`GIS query ${status}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            reject(new Error('GIS response was not JSON'));
+          }
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('GIS query timeout'));
+    });
+    req.on('error', reject);
+    req.end();
   });
-  if (!res.ok) throw new Error(`GIS query ${res.status}`);
-  return res.json();
+}
+
+async function arcgisQuery(url: string, params: Record<string, string>): Promise<any> {
+  const full = `${url}?${new URLSearchParams(params)}`;
+  let host = '';
+  try {
+    host = new NodeURL(url).hostname;
+  } catch {
+    /* ignore */
+  }
+
+  // Known incomplete-chain portals (Jefferson assessor): avoid Node leaf-verify failure.
+  if (host && TLS_INCOMPLETE_CHAIN_HOSTS.has(host)) {
+    const data = await httpsGetJson(full, { rejectUnauthorized: false });
+    if (data?.error) {
+      const msg = data.error?.message || JSON.stringify(data.error);
+      throw new Error(`GIS error: ${msg}`);
+    }
+    return data;
+  }
+
+  try {
+    const res = await fetch(full, {
+      cache: 'no-store',
+      headers: GIS_FETCH_HEADERS,
+    });
+    if (!res.ok) throw new Error(`GIS query ${res.status}`);
+    const data = await res.json();
+    if (data?.error) {
+      const msg = data.error?.message || JSON.stringify(data.error);
+      throw new Error(`GIS error: ${msg}`);
+    }
+    return data;
+  } catch (err) {
+    // Hardcoded endpoints only — if a portal's chain breaks later, fail soft with a clear log.
+    if (host && isTlsCertError(err)) {
+      console.warn(
+        `[parcel] TLS cert error for ${host}; retrying with relaxed chain verification (encrypted HTTPS retained)`
+      );
+      const data = await httpsGetJson(full, { rejectUnauthorized: false });
+      if (data?.error) {
+        const msg = data.error?.message || JSON.stringify(data.error);
+        throw new Error(`GIS error: ${msg}`);
+      }
+      return data;
+    }
+    throw err;
+  }
 }
 
 function ringsFromGeoJsonFeature(f: any): LngLat[][] {
@@ -181,6 +300,8 @@ function cleanAddrPart(raw: unknown): string | null {
   if (raw == null) return null;
   const s = String(raw).replace(/\s+/g, ' ').trim();
   if (!s || /^null$/i.test(s) || s === 'None' || s === '.' || s === '-') return null;
+  // Assessor placeholders (Jefferson often uses "0-0" / "0" for blank ZIP)
+  if (/^0+(-0+)*$/.test(s)) return null;
   return s;
 }
 
@@ -201,11 +322,14 @@ function formatAddress(parts: {
   let state = cleanAddrPart(parts.state);
   let zip = cleanAddrPart(parts.zip);
   if (zip) zip = zip.replace(/\s+/g, '').slice(0, 10);
+  // Drop non-ZIP placeholders that slipped through (e.g. "0-0")
+  if (zip && !/^\d{5}(-\d{4})?$/.test(zip)) zip = null;
   if (state && state.length > 2 && state.toUpperCase() === 'IDAHO') state = 'ID';
   if (state && state.length === 2) state = state.toUpperCase();
 
   const line1 = [street, street2].filter(Boolean).join(', ');
-  if (!line1 && !city && !zip) return null;
+  // Need at least a street or city — bare "ID" / zip-only is not useful
+  if (!line1 && !city) return null;
 
   const upperLine = line1.toUpperCase();
   const cityAlready =
@@ -214,7 +338,7 @@ function formatAddress(parts: {
   const tail: string[] = [];
   if (city && !cityAlready) tail.push(city);
   if (state && zip) tail.push(`${state} ${zip}`);
-  else if (state) tail.push(state);
+  else if (state && (line1 || city)) tail.push(state);
   else if (zip) tail.push(zip);
 
   if (!line1) return tail.join(', ') || null;

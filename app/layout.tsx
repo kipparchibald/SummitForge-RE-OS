@@ -4,11 +4,11 @@ import { isDemoMode, validateEnv } from '@/lib/env'
 import {
   deploymentBranding,
   deploymentBrandCssText,
-  hasDeploymentBranding,
 } from '@/lib/branding/deployment'
 import MobileNav from '@/components/MobileNav'
 import { AppNavLinks } from '@/components/AppNavLinks'
 import GlobalToasts from '@/components/GlobalToasts'
+import { BrandPhone, BrandText } from '@/components/BrandText'
 
 export const metadata = {
   title: 'SummitForge RE OS',
@@ -24,8 +24,10 @@ export default function RootLayout({
   const isDemo = isDemoMode();
   const envStatus = validateEnv();
   const brand = deploymentBranding();
-  const hasEnvBrand = hasDeploymentBranding(brand);
   const brandCss = deploymentBrandCssText(brand);
+  const companyFallback = brand.companyName || 'SummitForge';
+  const taglineFallback = brand.tagline || 'RE OS · Eastern Idaho';
+  const phoneFallback = brand.phone || '(208) 745-5911';
 
   return (
     <html lang="en" data-demo={isDemo ? 'on' : 'off'} suppressHydrationWarning>
@@ -36,6 +38,12 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: brandCss }}
           />
         ) : null}
+        {/*
+          Pre-hydration script: CSS vars + live badge only.
+          Do NOT mutate company/tagline/phone text here — that races React hydration
+          when localStorage branding differs from server env (Archibald vs SummitForge).
+          Text labels are applied after mount via BrandText / BrandPhone.
+        */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -52,108 +60,56 @@ export default function RootLayout({
                     }
                   } catch (e) {}
 
-                  function applyAfterHydrate() {
+                  try {
+                    var demoOverride = localStorage.getItem('summitforge_demo');
+                    if (demoOverride === 'off' || demoOverride === 'on') {
+                      root.setAttribute('data-demo', demoOverride);
+                    }
+                  } catch (e) {}
+
+                  function formatTime(iso) {
+                    if (!iso) return '--:--';
                     try {
-                      var saved2 = localStorage.getItem('summitforge_branding');
-                      if (saved2) {
-                        var b2 = JSON.parse(saved2);
-                        if (b2.companyName) {
-                          document.querySelectorAll('[data-company-name]').forEach(function(el) {
-                            el.textContent = b2.companyName;
-                          });
-                        }
-                        if (b2.phone) {
-                          document.querySelectorAll('[data-phone]').forEach(function(el) {
-                            el.textContent = b2.phone;
-                            if (el.tagName === 'A') el.href = 'tel:' + String(b2.phone).replace(/[^0-9]/g, '');
-                          });
-                        }
-                        if (b2.tagline) {
-                          document.querySelectorAll('[data-tagline]').forEach(function(el) {
-                            el.textContent = b2.tagline;
-                          });
-                        }
-                      } else if (!${JSON.stringify(hasEnvBrand)}) {
-                        var demoAttr = root.getAttribute('data-demo');
-                        if (demoAttr === 'off') {
-                          var prodDefault = {
-                            companyName: 'SummitForge',
-                            tagline: 'RE OS • Professional Land & Development',
-                            phone: '(208) 745-5911'
-                          };
-                          document.querySelectorAll('[data-company-name]').forEach(function(el) {
-                            if (!el.textContent || el.textContent === 'SummitForge') el.textContent = prodDefault.companyName;
-                          });
-                          document.querySelectorAll('[data-tagline]').forEach(function(el) {
-                            if (!el.textContent || el.textContent.indexOf('Jefferson') !== -1) el.textContent = prodDefault.tagline;
-                          });
-                          document.querySelectorAll('[data-phone]').forEach(function(el) {
-                            if (!el.textContent || el.textContent.indexOf('745') !== -1) {
-                              el.textContent = prodDefault.phone;
-                              if (el.tagName === 'A') el.href = 'tel:2087455911';
-                            }
-                          });
-                        }
-                      }
-
-                      var demoOverride = localStorage.getItem('summitforge_demo');
-                      if (demoOverride === 'off' || demoOverride === 'on') {
-                        root.setAttribute('data-demo', demoOverride);
-                      }
-
-                      (function initLiveStatusBadge() {
-                        function formatTime(iso) {
-                          if (!iso) return '--:--';
-                          try {
-                            return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          } catch (e) { return '--:--'; }
-                        }
-                        function isRecent(iso) {
-                          if (!iso) return false;
-                          try {
-                            return (Date.now() - new Date(iso).getTime()) < 60 * 60 * 1000;
-                          } catch (e) { return false; }
-                        }
-                        function updateBadge() {
-                          var el = document.getElementById('live-status-badge');
-                          if (!el) return;
-                          var ts = null;
-                          try { ts = localStorage.getItem('summitforge_last_navica_pull'); } catch (e) {}
-                          var timeStr = formatTime(ts);
-                          var recent = isRecent(ts);
-                          el.textContent = 'Live • Last: ' + timeStr;
-                          if (recent) {
-                            el.style.color = '#166534';
-                            el.style.borderColor = '#86efac';
-                            el.style.background = '#f0fdf4';
-                          } else if (ts) {
-                            el.style.color = '#854d0e';
-                            el.style.borderColor = '#fde047';
-                            el.style.background = '#fefce8';
-                          } else {
-                            el.style.color = '#4b5563';
-                            el.style.borderColor = '#e5e7eb';
-                            el.style.background = '#fff';
-                          }
-                        }
-                        updateBadge();
-                        setInterval(updateBadge, 30000);
-                        window.addEventListener('storage', function(e) {
-                          if (e.key === 'summitforge_last_navica_pull') updateBadge();
-                        });
-                        window.addEventListener('navica-pull-updated', updateBadge);
-                        window.addEventListener('summitforge-branding-updated', applyAfterHydrate);
-                      })();
-                    } catch (e) {}
+                      return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) { return '--:--'; }
                   }
-
+                  function isRecent(iso) {
+                    if (!iso) return false;
+                    try {
+                      return (Date.now() - new Date(iso).getTime()) < 60 * 60 * 1000;
+                    } catch (e) { return false; }
+                  }
+                  function updateBadge() {
+                    var el = document.getElementById('live-status-badge');
+                    if (!el) return;
+                    var ts = null;
+                    try { ts = localStorage.getItem('summitforge_last_navica_pull'); } catch (e) {}
+                    el.textContent = 'Live • Last: ' + formatTime(ts);
+                    if (isRecent(ts)) {
+                      el.style.color = '#166534';
+                      el.style.borderColor = '#86efac';
+                      el.style.background = '#f0fdf4';
+                    } else if (ts) {
+                      el.style.color = '#854d0e';
+                      el.style.borderColor = '#fde047';
+                      el.style.background = '#fefce8';
+                    } else {
+                      el.style.color = '#4b5563';
+                      el.style.borderColor = '#e5e7eb';
+                      el.style.background = '#fff';
+                    }
+                  }
+                  // Badge has suppressHydrationWarning; update after first paint
                   if (typeof requestAnimationFrame === 'function') {
-                    requestAnimationFrame(function() {
-                      requestAnimationFrame(applyAfterHydrate);
-                    });
+                    requestAnimationFrame(function() { requestAnimationFrame(updateBadge); });
                   } else {
-                    setTimeout(applyAfterHydrate, 0);
+                    setTimeout(updateBadge, 0);
                   }
+                  setInterval(updateBadge, 30000);
+                  window.addEventListener('storage', function(e) {
+                    if (e.key === 'summitforge_last_navica_pull') updateBadge();
+                  });
+                  window.addEventListener('navica-pull-updated', updateBadge);
                 } catch (e) {}
               })();
             `,
@@ -182,13 +138,15 @@ export default function RootLayout({
                 href="/"
                 className="font-semibold text-xl tracking-tight block"
                 style={{ color: 'var(--primary)' }}
-                data-company-name
               >
-                {brand.companyName || 'SummitForge'}
+                <BrandText field="companyName" fallback={companyFallback} />
               </Link>
-              <div className="text-[11px] text-slate-500 mt-0.5 leading-snug" data-tagline>
-                {brand.tagline || 'RE OS · Eastern Idaho'}
-              </div>
+              <BrandText
+                field="tagline"
+                fallback={taglineFallback}
+                as="div"
+                className="text-[11px] text-slate-500 mt-0.5 leading-snug"
+              />
             </div>
             <div className="flex-1 overflow-y-auto px-3 py-4">
               <AppNavLinks />
@@ -213,17 +171,16 @@ export default function RootLayout({
               <div className="flex items-center gap-3 min-w-0">
                 <div className="lg:hidden flex items-center gap-2">
                   <MobileNav
-                    companyName={brand.companyName || 'SummitForge'}
-                    tagline={brand.tagline || 'RE OS · Eastern Idaho'}
+                    companyName={companyFallback}
+                    tagline={taglineFallback}
                     isDemo={isDemo}
                   />
                   <Link
                     href="/"
                     className="font-semibold truncate"
                     style={{ color: 'var(--primary)' }}
-                    data-company-name
                   >
-                    {brand.companyName || 'SummitForge'}
+                    <BrandText field="companyName" fallback={companyFallback} />
                   </Link>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
@@ -235,13 +192,10 @@ export default function RootLayout({
               </div>
 
               <div className="flex items-center gap-2 sm:gap-3 text-sm shrink-0">
-                <a
-                  href={`tel:${(brand.phone || '(208) 745-5911').replace(/[^0-9]/g, '')}`}
+                <BrandPhone
+                  fallback={phoneFallback}
                   className="hidden md:inline font-medium text-slate-700 hover:text-[var(--primary)] text-xs"
-                  data-phone
-                >
-                  {brand.phone || '(208) 745-5911'}
-                </a>
+                />
                 <span
                   id="live-status-badge"
                   suppressHydrationWarning

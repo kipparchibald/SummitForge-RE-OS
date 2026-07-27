@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { loadPlatParcel, clearPlatParcel } from '@/lib/development/plat-handoff';
@@ -151,6 +151,20 @@ const PRESETS = [
 ];
 
 export default function AiPlatStudioPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] flex items-center justify-center text-sm text-neutral-500">
+          Loading AI Plat Studio…
+        </div>
+      }
+    >
+      <AiPlatStudioInner />
+    </Suspense>
+  );
+}
+
+function AiPlatStudioInner() {
   const searchParams = useSearchParams();
   const [address, setAddress] = useState(PRESETS[0].address);
   const [acres, setAcres] = useState(String(PRESETS[0].acres));

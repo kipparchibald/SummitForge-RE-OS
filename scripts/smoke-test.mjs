@@ -203,15 +203,41 @@ var critical = [
   'app/api/health/route.ts',
   'app/cma/page.tsx',
   'app/crm/page.tsx',
+  'app/offer/page.tsx',
+  'app/portal/page.tsx',
+  'app/forms/page.tsx',
+  'app/transactions/page.tsx',
   'app/development/plat/page.tsx',
   'app/analytics/page.tsx',
   'app/monitoring/page.tsx',
   'app/marketing/page.tsx',
+  'app/alerts/page.tsx',
+  'app/api/gis/parcel/route.ts',
+  'app/api/realtime/stream/route.ts',
+  'app/api/realtime/publish/route.ts',
+  'app/api/nurture/send-sms/route.ts',
   'lib/import/feedTypes.ts',
   'lib/development/land-engine.ts',
+  'lib/development/parcel.ts',
   'lib/cma/engine.ts',
   'lib/cma/from-gis.ts',
+  'lib/cma/export.ts',
+  'lib/offer/engine.ts',
+  'lib/nurture/sequences.ts',
+  'lib/nurture/sms.ts',
+  'lib/realtime/bus.ts',
+  'lib/realtime/client.ts',
+  'lib/transaction/checklist.ts',
+  'lib/transaction/store.ts',
+  'lib/toast/store.ts',
   'components/cma/ParcelAerialMap.tsx',
+  'components/cma/SubjectPresets.tsx',
+  'components/cma/ExportCmaButton.tsx',
+  'components/crm/NurturePanel.tsx',
+  'components/offer/OfferCTA.tsx',
+  'components/Providers.tsx',
+  'components/GlobalToasts.tsx',
+  'components/SystemHealthStrip.tsx',
   'lib/development/zoning.ts',
   'lib/development/plat-geometry.ts',
   'lib/crm/store.ts',
@@ -228,6 +254,20 @@ var critical = [
 critical.forEach(function (rel) {
   assert(fs.existsSync(path.join(root, rel)), 'Exists: ' + rel);
 });
+
+// Parcel module must keep Jefferson TLS incomplete-chain allowlist (owner-of-record fix)
+var parcelSrc = fs.readFileSync(path.join(root, 'lib/development/parcel.ts'), 'utf8');
+assert(
+  parcelSrc.indexOf('gisportal.co.jefferson.id.us') !== -1,
+  'parcel.ts references Jefferson assessor host'
+);
+assert(
+  parcelSrc.indexOf('TLS_INCOMPLETE_CHAIN_HOSTS') !== -1 ||
+    parcelSrc.indexOf('rejectUnauthorized: false') !== -1,
+  'parcel.ts has TLS incomplete-chain handling for Jefferson'
+);
+assert(parcelSrc.indexOf('enrichJefferson') !== -1, 'parcel.ts has enrichJefferson');
+assert(parcelSrc.indexOf('OWNER') !== -1, 'parcel.ts maps OWNER field');
 
 var pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 assert(pkg.scripts && pkg.scripts['test:smoke'], 'package.json has test:smoke');
@@ -381,21 +421,184 @@ assert(acresIfM2 > 500 && acresIfM2 < 600, 'STArea as m² ≈ 552 ac (got ' + ac
 assert(acresIfSqFt > 40 && acresIfSqFt < 60, 'STArea as ft² would wrongly be ~51 ac');
 assert(acresIfM2 / acresIfSqFt > 10, 'm² vs ft² misread is ~10.76×');
 
-// ─── 9. Optional live HTTP checks ───
+// ─── 9. Offer decision engine (mirrors lib/offer/engine.ts scoring shape) ───
+console.log('\n9. Offer decision engine');
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n));
+}
+function evaluateOfferMini(listPrice, offerPrice, opts) {
+  opts = opts || {};
+  var pctOfList = listPrice > 0 ? offerPrice / listPrice : 1;
+  var avgStl = opts.avgStl || 0.98;
+  var expectedClear = listPrice * avgStl;
+  var priceDelta = (offerPrice - expectedClear) / expectedClear;
+  var priceScore = clamp(50 + priceDelta * 200, 5, 95);
+  var termsScore = 55;
+  if (opts.cash) termsScore += 18;
+  if (opts.inspection === false) termsScore += 8;
+  termsScore = clamp(termsScore, 10, 95);
+  var marketScore = 50;
+  var win = clamp(Math.round(priceScore * 0.5 + termsScore * 0.3 + marketScore * 0.2), 5, 95);
+  return { winProbability: win, pctOfList: pctOfList, priceScore: priceScore };
+}
+var fullPrice = evaluateOfferMini(489000, 489000, { cash: true });
+var lowball = evaluateOfferMini(489000, 420000, {});
+assert(fullPrice.winProbability > lowball.winProbability, 'Full-price cash beats lowball');
+assert(fullPrice.pctOfList === 1, 'Full price is 100% of list');
+assert(lowball.pctOfList < 0.9, 'Lowball under 90% of list');
+assert(fullPrice.winProbability >= 40 && fullPrice.winProbability <= 95, 'Win prob in band');
+
+// ─── 10. Nurture template tokens ───
+console.log('\n10. Nurture templates');
+function renderTemplate(template, ctx) {
+  var first =
+    ctx.firstName ||
+    (ctx.name ? String(ctx.name).split(/\s+/)[0] : 'there');
+  var budget =
+    ctx.budget != null
+      ? '$' + Number(ctx.budget).toLocaleString('en-US', { maximumFractionDigits: 0 })
+      : 'your budget';
+  return template
+    .replace(/\{\{firstName\}\}/g, first)
+    .replace(/\{\{name\}\}/g, ctx.name || first)
+    .replace(/\{\{agent\}\}/g, ctx.agent || 'your agent')
+    .replace(/\{\{area\}\}/g, ctx.area || 'Eastern Idaho')
+    .replace(/\{\{budget\}\}/g, budget)
+    .replace(/\{\{interest\}\}/g, ctx.interest || 'homes');
+}
+var sms = renderTemplate(
+  'Hi {{firstName}} — this is {{agent}} in {{area}}. Budget {{budget}}.',
+  { name: 'Alex Buyer', agent: 'Kipp Archibald', area: 'Rigby', budget: 450000 }
+);
+assert(sms.indexOf('Alex') !== -1, 'Template fills firstName');
+assert(sms.indexOf('Kipp') !== -1, 'Template fills agent');
+assert(sms.indexOf('Rigby') !== -1, 'Template fills area');
+assert(sms.indexOf('450,000') !== -1 || sms.indexOf('450000') !== -1, 'Template fills budget');
+assert(sms.indexOf('{{') === -1, 'No leftover tokens');
+
+// ─── 11. Assessor address cleaning (Jefferson placeholders) ───
+console.log('\n11. Assessor address cleaning');
+function cleanAddrPart(raw) {
+  if (raw == null) return null;
+  var s = String(raw).replace(/\s+/g, ' ').trim();
+  if (!s || /^null$/i.test(s) || s === 'None' || s === '.' || s === '-') return null;
+  if (/^0+(-0+)*$/.test(s)) return null;
+  return s;
+}
+function formatAddress(parts) {
+  var street = cleanAddrPart(parts.street);
+  var city = cleanAddrPart(parts.city);
+  var state = cleanAddrPart(parts.state);
+  var zip = cleanAddrPart(parts.zip);
+  if (zip) zip = zip.replace(/\s+/g, '').slice(0, 10);
+  if (zip && !/^\d{5}(-\d{4})?$/.test(zip)) zip = null;
+  if (state && state.length === 2) state = state.toUpperCase();
+  var line1 = street || '';
+  if (!line1 && !city) return null;
+  var tail = [];
+  if (city) tail.push(city);
+  if (state && zip) tail.push(state + ' ' + zip);
+  else if (state && (line1 || city)) tail.push(state);
+  else if (zip) tail.push(zip);
+  if (!line1) return tail.join(', ') || null;
+  if (!tail.length) return line1;
+  return line1 + ', ' + tail.join(', ');
+}
+assert(cleanAddrPart('0-0') === null, 'ZIP placeholder 0-0 rejected');
+assert(cleanAddrPart('83442') === '83442', 'Real ZIP kept');
+assert(formatAddress({ street: '', city: '', state: 'ID', zip: '0-0' }) === null, 'No fake ID 0-0 address');
+assert(
+  formatAddress({ street: '100 S STATE ST', city: 'RIGBY', state: 'ID', zip: '83442' }).indexOf('RIGBY') !== -1,
+  'Real situs formats'
+);
+
+// ─── 12. Transaction checklist dates ───
+console.log('\n12. Transaction checklist');
+function dueDateIso(effectiveDate, dayOffset) {
+  var d = new Date(effectiveDate + 'T12:00:00');
+  d.setDate(d.getDate() + dayOffset);
+  return d.toISOString().slice(0, 10);
+}
+assert(dueDateIso('2026-07-01', 10) === '2026-07-11', 'Earnest due +10 days');
+assert(dueDateIso('2026-07-01', 0) === '2026-07-01', 'Effective day offset 0');
+
+// ─── 13. CMA export HTML shape ───
+console.log('\n13. CMA export HTML');
+function escapeHtmlSmoke(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+assert(escapeHtmlSmoke('A & B <x>') === 'A &amp; B &lt;x&gt;', 'escapeHtml encodes entities');
+function buildCmaHtmlMini(subject, indicatedValue) {
+  return (
+    '<!DOCTYPE html><html><head><title>CMA — ' +
+    escapeHtmlSmoke(subject) +
+    '</title></head><body>' +
+    '<div class="hero"><div class="addr">' +
+    escapeHtmlSmoke(subject) +
+    '</div></div>' +
+    '<div class="stat accent"><span class="value">$' +
+    indicatedValue.toLocaleString() +
+    '</span></div>' +
+    '<button onclick="window.print()">Print / Save as PDF</button></body></html>'
+  );
+}
+var exportHtml = buildCmaHtmlMini('100 S State St, Rigby, ID', 489000);
+assert(exportHtml.indexOf('<!DOCTYPE html>') === 0, 'Export starts with doctype');
+assert(exportHtml.indexOf('CMA —') !== -1, 'Export title has CMA');
+assert(exportHtml.indexOf('489,000') !== -1 || exportHtml.indexOf('489000') !== -1, 'Export shows value');
+assert(exportHtml.indexOf('window.print') !== -1, 'Export includes print action');
+// Regression: window.open must not use noopener feature (returns null Window)
+var exportSrc = fs.readFileSync(path.join(root, 'lib/cma/export.ts'), 'utf8');
+assert(exportSrc.indexOf('createObjectURL') !== -1, 'export uses blob URL');
+assert(
+  exportSrc.indexOf("window.open(url, '_blank', 'noopener") === -1 &&
+    exportSrc.indexOf('noopener,noreferrer,width') === -1,
+  'export does not open with noopener features (null Window bug)'
+);
+assert(exportSrc.indexOf('&amp;') !== -1, 'export escapeHtml uses real HTML entities');
+
+// ─── 14. Optional live HTTP checks ───
 var base = process.env.SMOKE_BASE_URL;
+async function fetchJson(url, init, timeoutMs) {
+  var ctrl = new AbortController();
+  var t = setTimeout(function () {
+    ctrl.abort();
+  }, timeoutMs || 45000);
+  try {
+    var res = await fetch(url, Object.assign({}, init || {}, { signal: ctrl.signal }));
+    var text = await res.text();
+    var body = null;
+    try {
+      body = JSON.parse(text);
+    } catch (_) {
+      body = { _raw: text.slice(0, 200) };
+    }
+    return { status: res.status, body: body, ok: res.ok };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function liveChecks() {
   if (!base) {
-    console.log('\n9. Live HTTP (skipped — set SMOKE_BASE_URL to enable)');
+    console.log('\n14. Live HTTP (skipped — set SMOKE_BASE_URL to enable)');
     return;
   }
-  console.log('\n9. Live HTTP against ' + base);
+  var rootUrl = base.replace(/\/$/, '');
+  console.log('\n14. Live HTTP against ' + rootUrl);
   try {
-    var healthRes = await fetch(base.replace(/\/$/, '') + '/api/health');
-    var health = await healthRes.json();
+    var healthRes = await fetchJson(rootUrl + '/api/health', null, 15000);
+    var health = healthRes.body || {};
     assert(healthRes.status === 200 || healthRes.status === 503, 'Health responds (' + healthRes.status + ')');
     assert(typeof health.ok === 'boolean', 'Health has ok flag');
     assert(health.navica && typeof health.navica.configured === 'boolean', 'Health reports navica');
     assert(health.supabase && typeof health.supabase.schemaOk === 'boolean', 'Health reports schema');
+    assert(health.ai && typeof health.ai.live === 'boolean', 'Health reports AI');
+    assert(health.twilio && typeof health.twilio.configured === 'boolean', 'Health reports Twilio');
 
     var pages = [
       '/',
@@ -406,48 +609,137 @@ async function liveChecks() {
       '/alerts',
       '/cma',
       '/crm',
+      '/offer',
+      '/portal',
+      '/forms',
       '/analytics',
       '/monitoring',
       '/transactions',
       '/marketing',
+      '/pricing',
+      '/setup',
+      '/mortgage',
+      '/publish',
+      '/settings/branding',
+      '/reports/land-analysis',
     ];
     for (var p of pages) {
-      var r = await fetch(base.replace(/\/$/, '') + p);
+      var r = await fetch(rootUrl + p);
       assert(r.status === 200, 'GET ' + p + ' -> ' + r.status);
     }
 
-    var scan = await fetch(base.replace(/\/$/, '') + '/api/development/land-scan?minAcres=5');
-    var scanBody = await scan.json();
+    var scan = await fetchJson(rootUrl + '/api/development/land-scan?minAcres=5', null, 60000);
     assert(scan.status === 200, 'Land scan 200');
-    assert(typeof scanBody.analyzed === 'number', 'Land scan analyzed count');
-    assert(Array.isArray(scanBody.all) || Array.isArray(scanBody.top), 'Land scan returns deals');
+    assert(typeof (scan.body && scan.body.analyzed) === 'number', 'Land scan analyzed count');
+    assert(
+      Array.isArray(scan.body && scan.body.all) || Array.isArray(scan.body && scan.body.top),
+      'Land scan returns deals'
+    );
 
-    var analyze = await fetch(base.replace(/\/$/, '') + '/api/development/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ listing: { address: '40ac Terreton', acres: 40, price: 620000 } }),
-    });
-    var analyzeBody = await analyze.json();
+    var analyze = await fetchJson(
+      rootUrl + '/api/development/analyze',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listing: { address: '40ac Terreton', acres: 40, price: 620000 } }),
+      },
+      60000
+    );
     assert(analyze.status === 200, 'Analyze 200');
-    assert(analyzeBody.verdict === 'OFFER' || analyzeBody.verdict === 'PASS', 'Analyze has verdict');
+    assert(
+      analyze.body && (analyze.body.verdict === 'OFFER' || analyze.body.verdict === 'PASS'),
+      'Analyze has verdict'
+    );
 
-    var plat = await fetch(base.replace(/\/$/, '') + '/api/development/plat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        acres: 40,
-        lat: 43.67,
-        lng: -111.91,
-        county: 'Jefferson',
-        concept: true,
-        withAi: false,
-      }),
-    });
-    var platBody = await plat.json();
+    var plat = await fetchJson(
+      rootUrl + '/api/development/plat',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          acres: 40,
+          lat: 43.67,
+          lng: -111.91,
+          county: 'Jefferson',
+          concept: true,
+          withAi: false,
+        }),
+      },
+      60000
+    );
     assert(plat.status === 200, 'Concept plat 200');
-    assert(platBody.svg && platBody.svg.indexOf('<svg') !== -1, 'Plat returns SVG');
-    assert(platBody.metrics && typeof platBody.metrics.lots === 'number', 'Plat metrics.lots');
-    assert(platBody.geometrySource === 'concept', 'Plat geometrySource=concept');
+    assert(plat.body && plat.body.svg && plat.body.svg.indexOf('<svg') !== -1, 'Plat returns SVG');
+    assert(plat.body && plat.body.metrics && typeof plat.body.metrics.lots === 'number', 'Plat metrics.lots');
+    assert(plat.body && plat.body.geometrySource === 'concept', 'Plat geometrySource=concept');
+
+    // GIS parcel identify + Jefferson assessor owner-of-record (TLS incomplete-chain host)
+    console.log('\n14b. Live GIS parcel ownership (Jefferson assessor)');
+    var parcelPoint = await fetchJson(
+      rootUrl + '/api/gis/parcel?lat=43.672&lng=-111.915&sos=0',
+      null,
+      60000
+    );
+    assert(parcelPoint.status === 200, 'GIS point parcel 200 (got ' + parcelPoint.status + ')');
+    assert(parcelPoint.body && parcelPoint.body.ok === true, 'GIS point ok');
+    var pp = (parcelPoint.body && parcelPoint.body.parcel) || {};
+    assert(!!pp.pin, 'GIS point has PIN (' + (pp.pin || 'none') + ')');
+    assert(!!pp.owner, 'GIS owner of record present (' + (pp.owner || 'MISSING') + ')');
+    assert(
+      pp.source && String(pp.source).toLowerCase().indexOf('jefferson') !== -1,
+      'GIS source includes Jefferson assessor'
+    );
+    assert(
+      !pp.parcelAddress || String(pp.parcelAddress).indexOf('0-0') === -1,
+      'GIS address not placeholder 0-0'
+    );
+
+    var parcelPin = await fetchJson(
+      rootUrl + '/api/gis/parcel?pin=RP04N34E360000&sos=0',
+      null,
+      60000
+    );
+    assert(parcelPin.status === 200, 'GIS PIN parcel 200');
+    var pinP = (parcelPin.body && parcelPin.body.parcel) || {};
+    assert(pinP.owner === 'STATE OF IDAHO' || !!pinP.owner, 'PIN sample has owner (' + (pinP.owner || 'MISSING') + ')');
+    assert(
+      pinP.size && pinP.size.legalAcres != null && pinP.size.legalAcres > 500,
+      'PIN legal acres from assessor (~560)'
+    );
+
+    // Realtime publish (in-process bus) — should accept a demo event
+    var rt = await fetchJson(
+      rootUrl + '/api/realtime/publish',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: 'system',
+          type: 'smoke_test',
+          payload: { ok: true },
+        }),
+      },
+      15000
+    );
+    assert(rt.status === 200 || rt.status === 201 || rt.status === 400 || rt.status === 422, 'Realtime publish responds (' + rt.status + ')');
+
+    // Nurture SMS (simulated when Twilio unset)
+    var smsRes = await fetchJson(
+      rootUrl + '/api/nurture/send-sms',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: '+12085550100',
+          body: 'SummitForge smoke test — ignore',
+          contactName: 'Smoke Test',
+        }),
+      },
+      15000
+    );
+    assert(
+      smsRes.status === 200 || smsRes.status === 400 || smsRes.status === 422,
+      'Nurture SMS responds (' + smsRes.status + ')'
+    );
   } catch (e) {
     failed += 1;
     console.error('  FAIL Live checks: ' + (e && e.message ? e.message : e));

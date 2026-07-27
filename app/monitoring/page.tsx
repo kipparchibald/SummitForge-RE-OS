@@ -846,5 +846,9 @@ function fmtMoney(v: number | null | undefined) {
   if (v == null) {
     return <span className="text-slate-400 font-normal">Not in county / statewide layer</span>;
   }
+  // Assessor often returns 0 for tax-exempt / government land (e.g. STATE OF IDAHO)
+  if (v === 0) {
+    return <span className="text-slate-500 font-normal">$0 (exempt / unassessed)</span>;
+  }
   return money(v);
 }

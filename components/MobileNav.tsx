@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppNavLinks } from './AppNavLinks';
+import { BrandText } from './BrandText';
 
 export default function MobileNav({
   companyName,
@@ -68,9 +69,14 @@ export default function MobileNav({
                   className="font-semibold text-xl tracking-tight"
                   style={{ color: 'var(--primary)' }}
                 >
-                  {companyName}
+                  <BrandText field="companyName" fallback={companyName} />
                 </Link>
-                <div className="text-xs text-gray-500 mt-0.5">{tagline}</div>
+                <BrandText
+                  field="tagline"
+                  fallback={tagline}
+                  as="div"
+                  className="text-xs text-gray-500 mt-0.5"
+                />
               </div>
               <button
                 type="button"
