@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import StatusBadge, { toneFromBool } from '@/components/ui/StatusBadge';
+import RealtimeStatus from '@/components/RealtimeStatus';
 
 type HealthPayload = {
   ok?: boolean;
@@ -14,7 +15,7 @@ type HealthPayload = {
   cron?: { secretConfigured?: boolean };
 };
 
-/** Compact live health strip — Navica, Twilio, Supabase, AI, mode. */
+/** Compact live health strip — Realtime WS, Navica, Twilio, Supabase, AI, mode. */
 export default function SystemHealthStrip({
   className = '',
   showLink = true,
@@ -43,6 +44,7 @@ export default function SystemHealthStrip({
   if (error) {
     return (
       <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+        <RealtimeStatus />
         <StatusBadge label="Health unreachable" tone="danger" />
       </div>
     );
@@ -51,6 +53,7 @@ export default function SystemHealthStrip({
   if (!health) {
     return (
       <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+        <RealtimeStatus />
         <StatusBadge label="Checking systems…" tone="neutral" pulse showDot />
       </div>
     );
@@ -61,6 +64,7 @@ export default function SystemHealthStrip({
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      <RealtimeStatus />
       <StatusBadge
         label={health.navica?.configured ? 'Navica Live' : 'Navica Demo'}
         tone={toneFromBool(health.navica?.configured, { warnWhenFalse: true })}
