@@ -10,6 +10,7 @@ import {
 } from '@/lib/nurture/sequences';
 import { loadContacts, type CrmContact } from '@/lib/crm/store';
 import { nurtureBrandContext } from '@/lib/nurture/brand';
+import { queueNurtureSms } from '@/lib/nurture/sms';
 
 /** MoxiWorks-style nurture enrollment + preview for agent CRM. */
 export default function NurturePanel() {
@@ -28,12 +29,38 @@ export default function NurturePanel() {
   const contact = contacts.find((c) => c.id === selectedContact);
   const brand = nurtureBrandContext();
 
-  const onEnroll = () => {
-    if (!selectedContact || !selectedSeq) return;
+  const onEnroll = async () => {
+    if (!selectedContact || !selectedSeq || !seq) return;
     enrollContact(selectedContact, selectedSeq);
     setEnrollments(loadEnrollments());
-    setToast(`Enrolled ${contact?.name || 'contact'} in “${seq?.name}”`);
-    setTimeout(() => setToast(''), 3000);
+
+    const step0 = seq.steps[0];
+    if (step0?.channel === 'sms' && contact?.phone) {
+      const body = renderTemplate(step0.body, {
+        name: contact.name,
+        agent: brand.agent,
+        area: contact.areas?.[0] || 'Eastern Idaho',
+        budget: contact.budget,
+        interest: contact.interest,
+      });
+      try {
+        const sms = await queueNurtureSms({
+          to: contact.phone,
+          body,
+          contactId: contact.id,
+          sequenceId: seq.id,
+          stepIndex: 0,
+        });
+        setToast(
+          `Enrolled ${contact.name} · first SMS ${sms.status === 'sent' ? 'sent' : 'queued (simulated)'}`
+        );
+      } catch {
+        setToast(`Enrolled ${contact.name} in “${seq.name}”`);
+      }
+    } else {
+      setToast(`Enrolled ${contact?.name || 'contact'} in “${seq.name}”`);
+    }
+    setTimeout(() => setToast(''), 4000);
   };
 
   const preview =
