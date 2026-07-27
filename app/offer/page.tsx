@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   DEMO_COMPS,
   DEMO_PROPERTIES,
@@ -22,7 +23,25 @@ function winTone(p: number): 'success' | 'warning' | 'danger' | 'info' {
   return 'danger';
 }
 
-export default function OfferDecisionPage() {
+function propertyFromParams(sp: URLSearchParams | null): OfferProperty | null {
+  if (!sp) return null;
+  const address = sp.get('address');
+  const price = Number(sp.get('price') || 0);
+  if (!address || !price) return null;
+  return {
+    address,
+    listPrice: price,
+    sqft: Number(sp.get('sqft') || 0) || undefined,
+    acres: Number(sp.get('acres') || 0) || undefined,
+    isLand: sp.get('land') === '1',
+    daysOnMarket: Number(sp.get('dom') || 0) || 14,
+    city: /ririe/i.test(address) ? 'Ririe' : 'Rigby',
+    propertyType: sp.get('land') === '1' ? 'Land' : 'Single Family',
+  };
+}
+
+function OfferDecisionInner() {
+  const searchParams = useSearchParams();
   const [property, setProperty] = useState<OfferProperty>(DEMO_PROPERTIES[0]);
   const [offerPrice, setOfferPrice] = useState(String(DEMO_PROPERTIES[0].listPrice));
   const [earnest, setEarnest] = useState(String(Math.round(DEMO_PROPERTIES[0].listPrice * 0.02)));
@@ -35,6 +54,18 @@ export default function OfferDecisionPage() {
   const [escalationMax, setEscalationMax] = useState(
     String(Math.round(DEMO_PROPERTIES[0].listPrice * 1.03))
   );
+  const [fromLink, setFromLink] = useState(false);
+
+  useEffect(() => {
+    const fromQ = propertyFromParams(searchParams);
+    if (fromQ) {
+      setProperty(fromQ);
+      setOfferPrice(String(fromQ.listPrice));
+      setEarnest(String(Math.round(fromQ.listPrice * 0.02)));
+      setEscalationMax(String(Math.round(fromQ.listPrice * 1.03)));
+      setFromLink(true);
+    }
+  }, [searchParams]);
 
   const terms: OfferTerms = useMemo(
     () => ({
@@ -58,6 +89,7 @@ export default function OfferDecisionPage() {
     setOfferPrice(String(p.listPrice));
     setEarnest(String(Math.round(p.listPrice * 0.02)));
     setEscalationMax(String(Math.round(p.listPrice * 1.03)));
+    setFromLink(false);
   };
 
   const applyRecommended = () => {
@@ -109,15 +141,22 @@ export default function OfferDecisionPage() {
               then copy a client-ready brief. Works fully offline until Navica is live.
             </p>
           </div>
-          <Link
-            href="/cma"
-            className="px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm"
-          >
-            Open CMA →
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/cma" className="px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm">
+              Open CMA →
+            </Link>
+            <Link href="/transactions" className="px-3 py-2 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm">
+              Transactions
+            </Link>
+          </div>
         </div>
 
-        {/* Demo property picker */}
+        {fromLink && (
+          <div className="rounded-xl border border-emerald-900 bg-emerald-950/40 px-4 py-2.5 text-sm text-emerald-200">
+            Loaded from match / listing / CMA link — tune terms below and copy the brief for your client.
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
           {DEMO_PROPERTIES.map((p) => (
             <button
@@ -125,7 +164,7 @@ export default function OfferDecisionPage() {
               type="button"
               onClick={() => selectDemo(p)}
               className={`px-3 py-2 rounded-xl text-xs sm:text-sm border transition ${
-                property.address === p.address
+                !fromLink && property.address === p.address
                   ? 'border-emerald-500 bg-emerald-950/50 text-emerald-300'
                   : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500'
               }`}
@@ -136,7 +175,6 @@ export default function OfferDecisionPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Inputs */}
           <div className="lg:col-span-2 space-y-4">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
               <div className="text-sm font-semibold text-zinc-200">Property</div>
@@ -152,23 +190,11 @@ export default function OfferDecisionPage() {
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
               <div className="text-sm font-semibold text-zinc-200">Your offer</div>
               <label className="block text-xs text-zinc-500">Offer price</label>
-              <input
-                className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm"
-                value={offerPrice}
-                onChange={(e) => setOfferPrice(e.target.value)}
-              />
+              <input className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} />
               <label className="block text-xs text-zinc-500">Earnest money</label>
-              <input
-                className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm"
-                value={earnest}
-                onChange={(e) => setEarnest(e.target.value)}
-              />
+              <input className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm" value={earnest} onChange={(e) => setEarnest(e.target.value)} />
               <label className="block text-xs text-zinc-500">Closing days</label>
-              <input
-                className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm"
-                value={closingDays}
-                onChange={(e) => setClosingDays(e.target.value)}
-              />
+              <input className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm" value={closingDays} onChange={(e) => setClosingDays(e.target.value)} />
 
               <div className="space-y-2 pt-1 text-sm text-zinc-300">
                 <label className="flex items-center gap-2">
@@ -176,64 +202,39 @@ export default function OfferDecisionPage() {
                   Cash offer
                 </label>
                 <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={inspection}
-                    onChange={(e) => setInspection(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={inspection} onChange={(e) => setInspection(e.target.checked)} />
                   Inspection contingency
                 </label>
                 {!cash && (
                   <>
                     <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={financing}
-                        onChange={(e) => setFinancing(e.target.checked)}
-                      />
+                      <input type="checkbox" checked={financing} onChange={(e) => setFinancing(e.target.checked)} />
                       Financing contingency
                     </label>
                     <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={appraisal}
-                        onChange={(e) => setAppraisal(e.target.checked)}
-                      />
+                      <input type="checkbox" checked={appraisal} onChange={(e) => setAppraisal(e.target.checked)} />
                       Appraisal contingency
                     </label>
                   </>
                 )}
                 <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={useEscalation}
-                    onChange={(e) => setUseEscalation(e.target.checked)}
-                  />
+                  <input type="checkbox" checked={useEscalation} onChange={(e) => setUseEscalation(e.target.checked)} />
                   Escalation clause
                 </label>
                 {useEscalation && (
                   <>
                     <label className="block text-xs text-zinc-500">Escalation max</label>
-                    <input
-                      className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm"
-                      value={escalationMax}
-                      onChange={(e) => setEscalationMax(e.target.value)}
-                    />
+                    <input className="w-full border border-zinc-700 bg-zinc-950 rounded-xl px-3 py-2 text-sm" value={escalationMax} onChange={(e) => setEscalationMax(e.target.value)} />
                   </>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={applyRecommended}
-                className="w-full py-2.5 rounded-xl border border-emerald-800 bg-emerald-950/40 text-emerald-300 text-sm hover:bg-emerald-950/70"
-              >
+              <button type="button" onClick={applyRecommended} className="w-full py-2.5 rounded-xl border border-emerald-800 bg-emerald-950/40 text-emerald-300 text-sm hover:bg-emerald-950/70">
                 Apply recommended terms
               </button>
             </div>
           </div>
 
-          {/* Decision */}
           <div className="lg:col-span-3 space-y-4">
             <div className="rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6 relative overflow-hidden">
               <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-emerald-600/30 via-transparent to-transparent" />
@@ -245,7 +246,10 @@ export default function OfferDecisionPage() {
                     <span className="text-2xl text-zinc-500">%</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <StatusBadge label={winTone(decision.winProbability) === 'success' ? 'Strong' : winTone(decision.winProbability) === 'warning' ? 'Competitive' : 'Uphill'} tone={winTone(decision.winProbability)} />
+                    <StatusBadge
+                      label={winTone(decision.winProbability) === 'success' ? 'Strong' : winTone(decision.winProbability) === 'warning' ? 'Competitive' : 'Uphill'}
+                      tone={winTone(decision.winProbability)}
+                    />
                     <StatusBadge label={`${decision.confidence} confidence`} tone="info" showDot={false} />
                   </div>
                 </div>
@@ -253,9 +257,7 @@ export default function OfferDecisionPage() {
                   <div>Price score · {decision.priceScore}</div>
                   <div>Terms score · {decision.termsScore}</div>
                   <div>Market score · {decision.marketScore}</div>
-                  <div className="text-zinc-300 pt-1">
-                    {Math.round(decision.pctOfList * 100)}% of list
-                  </div>
+                  <div className="text-zinc-300 pt-1">{Math.round(decision.pctOfList * 100)}% of list</div>
                 </div>
               </div>
               <p className="relative mt-5 text-sm text-zinc-300 leading-relaxed">{decision.narrative}</p>
@@ -282,28 +284,18 @@ export default function OfferDecisionPage() {
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
                 <div className="text-sm font-semibold text-emerald-400 mb-2">Strengths</div>
                 <ul className="text-sm text-zinc-300 space-y-1.5">
-                  {decision.strengths.length === 0 && (
-                    <li className="text-zinc-500">Tune price or terms to build strengths</li>
-                  )}
+                  {decision.strengths.length === 0 && <li className="text-zinc-500">Tune price or terms to build strengths</li>}
                   {decision.strengths.map((s) => (
-                    <li key={s} className="flex gap-2">
-                      <span className="text-emerald-500">✓</span>
-                      <span>{s}</span>
-                    </li>
+                    <li key={s} className="flex gap-2"><span className="text-emerald-500">✓</span><span>{s}</span></li>
                   ))}
                 </ul>
               </div>
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
                 <div className="text-sm font-semibold text-amber-400 mb-2">Risks</div>
                 <ul className="text-sm text-zinc-300 space-y-1.5">
-                  {decision.risks.length === 0 && (
-                    <li className="text-zinc-500">No major risks flagged</li>
-                  )}
+                  {decision.risks.length === 0 && <li className="text-zinc-500">No major risks flagged</li>}
                   {decision.risks.map((r) => (
-                    <li key={r} className="flex gap-2">
-                      <span className="text-amber-500">!</span>
-                      <span>{r}</span>
-                    </li>
+                    <li key={r} className="flex gap-2"><span className="text-amber-500">!</span><span>{r}</span></li>
                   ))}
                 </ul>
               </div>
@@ -332,17 +324,10 @@ export default function OfferDecisionPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={copyBrief}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-medium"
-              >
+              <button type="button" onClick={copyBrief} className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm font-medium">
                 Copy decision brief
               </button>
-              <Link
-                href="/transactions"
-                className="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm"
-              >
+              <Link href="/transactions" className="px-5 py-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-sm">
                 Open transaction file
               </Link>
             </div>
@@ -350,5 +335,19 @@ export default function OfferDecisionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OfferDecisionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[40vh] flex items-center justify-center bg-zinc-950 text-zinc-500 text-sm">
+          Loading offer engine…
+        </div>
+      }
+    >
+      <OfferDecisionInner />
+    </Suspense>
   );
 }
