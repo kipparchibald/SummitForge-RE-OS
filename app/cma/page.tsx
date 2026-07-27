@@ -11,91 +11,21 @@ import {
 } from '@/lib/cma/from-gis';
 import ParcelAerialMap from '@/components/cma/ParcelAerialMap';
 import ExportCmaButton from '@/components/cma/ExportCmaButton';
+import CmaOfferLink from '@/components/cma/CmaOfferLink';
 
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 const DEMO_COMPS: CompProperty[] = [
-  {
-    address: '4500 E Sunnyside, Idaho Falls, ID',
-    price: 2350000,
-    acres: 47.3,
-    propertyType: 'Land',
-    distanceMi: 12,
-    status: 'Active',
-  },
-  {
-    address: 'Sample 40 acres near Terreton, Terreton, ID',
-    price: 620000,
-    acres: 40,
-    propertyType: 'Land',
-    distanceMi: 18,
-    status: 'Active',
-  },
-  {
-    address: '2200 W 7000 S, Rexburg, ID',
-    price: 1450000,
-    acres: 28.5,
-    propertyType: 'Land',
-    distanceMi: 22,
-    status: 'Active',
-  },
-  {
-    address: '155 Snake River Rd, Swan Valley, ID',
-    price: 1180000,
-    acres: 22,
-    propertyType: 'Land',
-    distanceMi: 28,
-    status: 'Active',
-  },
-  {
-    address: '769 1580 N, Shelley, ID',
-    price: 575000,
-    acres: 5.8,
-    propertyType: 'Land',
-    distanceMi: 14,
-    status: 'Active',
-  },
-  {
-    address: '789 Lindy Lane, Rigby, ID',
-    price: 489000,
-    sqft: 1680,
-    beds: 3,
-    baths: 2,
-    propertyType: 'Single Family',
-    distanceMi: 1.2,
-    status: 'Pending',
-  },
-  {
-    address: '172 Kiana Dr, Rigby, ID',
-    price: 512000,
-    sqft: 1850,
-    beds: 4,
-    baths: 2.5,
-    propertyType: 'Single Family',
-    distanceMi: 2.1,
-    status: 'Coming Soon',
-  },
-  {
-    address: '3120 Woodruff Ave, Idaho Falls, ID',
-    price: 425000,
-    sqft: 1920,
-    beds: 4,
-    baths: 2,
-    propertyType: 'Single Family',
-    distanceMi: 3.4,
-    status: 'Active',
-  },
-  {
-    address: '48 N 2nd E, Rexburg, ID',
-    price: 379000,
-    sqft: 1540,
-    beds: 3,
-    baths: 2,
-    propertyType: 'Single Family',
-    distanceMi: 8.1,
-    status: 'Active',
-  },
+  { address: '4500 E Sunnyside, Idaho Falls, ID', price: 2350000, acres: 47.3, propertyType: 'Land', distanceMi: 12, status: 'Active' },
+  { address: 'Sample 40 acres near Terreton, Terreton, ID', price: 620000, acres: 40, propertyType: 'Land', distanceMi: 18, status: 'Active' },
+  { address: '2200 W 7000 S, Rexburg, ID', price: 1450000, acres: 28.5, propertyType: 'Land', distanceMi: 22, status: 'Active' },
+  { address: '155 Snake River Rd, Swan Valley, ID', price: 1180000, acres: 22, propertyType: 'Land', distanceMi: 28, status: 'Active' },
+  { address: '769 1580 N, Shelley, ID', price: 575000, acres: 5.8, propertyType: 'Land', distanceMi: 14, status: 'Active' },
+  { address: '789 Lindy Lane, Rigby, ID', price: 489000, sqft: 1680, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 1.2, status: 'Pending' },
+  { address: '172 Kiana Dr, Rigby, ID', price: 512000, sqft: 1850, beds: 4, baths: 2.5, propertyType: 'Single Family', distanceMi: 2.1, status: 'Coming Soon' },
+  { address: '3120 Woodruff Ave, Idaho Falls, ID', price: 425000, sqft: 1920, beds: 4, baths: 2, propertyType: 'Single Family', distanceMi: 3.4, status: 'Active' },
+  { address: '48 N 2nd E, Rexburg, ID', price: 379000, sqft: 1540, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 8.1, status: 'Active' },
 ];
 
 const DEFAULT_SUBJECT: SubjectProperty = {
@@ -139,7 +69,6 @@ export default function CMABuilder() {
   }, []);
 
   const result = useMemo(() => (ran ? runCma(subject, comps, 5) : null), [ran, subject, comps]);
-
   const isResidential = /single|family|home|new construction|condo|town/i.test(subject.propertyType || '');
 
   const pullNavicaComps = async () => {
@@ -149,14 +78,8 @@ export default function CMABuilder() {
       const res = await fetch('/api/import/listings?live=navica');
       const data = await res.json();
       const listings = (data.listings || []) as {
-        address: string;
-        price: number;
-        acres?: number;
-        propertyType?: string;
-        yearBuilt?: number;
-        beds?: number;
-        baths?: number;
-        sqft?: number;
+        address: string; price: number; acres?: number; propertyType?: string;
+        yearBuilt?: number; beds?: number; baths?: number; sqft?: number;
       }[];
       if (listings.length) {
         const mapped: CompProperty[] = listings.map((l) => ({
@@ -269,6 +192,9 @@ export default function CMABuilder() {
           <button type="button" onClick={pullNavicaComps} disabled={loading} className="px-4 py-2 text-sm rounded-xl border hover:bg-gray-50 disabled:opacity-50">
             Pull Navica comps
           </button>
+          <Link href="/offer" className="px-4 py-2 text-sm rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100">
+            Offer Engine →
+          </Link>
           <Link href="/development/plat" className="px-4 py-2 text-sm rounded-xl bg-emerald-600 text-white hover:bg-emerald-500">
             AI Plat residual →
           </Link>
@@ -358,7 +284,19 @@ export default function CMABuilder() {
             <button type="button" onClick={askAi} disabled={loading} className="w-full py-2.5 border rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
               AI valuation assist
             </button>
-            {result && <ExportCmaButton result={result} />}
+            {result && (
+              <>
+                <ExportCmaButton result={result} />
+                <CmaOfferLink
+                  address={subject.address}
+                  listPrice={subject.listPrice}
+                  indicatedValue={result.indicatedValue}
+                  acres={subject.acres}
+                  sqft={subject.sqft}
+                  propertyType={subject.propertyType}
+                />
+              </>
+            )}
           </div>
 
           <div className="bg-white border rounded-2xl p-5 text-xs text-gray-500 space-y-2">
