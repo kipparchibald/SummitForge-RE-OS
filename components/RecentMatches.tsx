@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { getMatches, markMatchNotified } from '@/lib/alerts/supabase-store';
 import type { AlertMatch } from '@/types/alerts';
+import OfferCTA from '@/components/offer/OfferCTA';
+import EmptyState from '@/components/ui/EmptyState';
 
 type Variant = 'light' | 'dark';
 
@@ -53,19 +55,15 @@ export default function RecentMatches({
 
   if (matches.length === 0) {
     return (
-      <div
-        className={`text-center py-12 ${
-          dark
-            ? 'text-zinc-500 bg-zinc-900/30 border border-dashed border-zinc-800 rounded-3xl'
-            : 'text-gray-500 bg-white border border-dashed border-gray-200 rounded-3xl'
-        }`}
-      >
-        <div className="text-3xl mb-2">🔔</div>
-        <div className={`font-medium ${dark ? 'text-zinc-300' : ''}`}>No matches yet</div>
-        <div className={`text-sm mt-1 ${dark ? 'text-zinc-500' : ''}`}>
-          Import a Navica CSV or create alerts. Matches appear here automatically.
-        </div>
-      </div>
+      <EmptyState
+        variant={dark ? 'dark' : 'light'}
+        title="No matches yet"
+        description="Import a Navica CSV or create alerts. Matches appear here automatically."
+        action={{
+          label: 'Open Offer Engine',
+          href: '/offer',
+        }}
+      />
     );
   }
 
@@ -78,6 +76,7 @@ export default function RecentMatches({
         const acres = snap?.acres;
         const alertName = m.alertName || `Alert ${m.alertId.slice(-6)}`;
         const channel = m.notificationMethod || 'in-app';
+        const isLand = (acres != null && acres >= 1) || /lot|land|acre/i.test(address);
 
         return (
           <div
@@ -95,9 +94,7 @@ export default function RecentMatches({
             }
           >
             <div className="min-w-0">
-              <div
-                className={`font-medium truncate ${dark ? 'text-zinc-100' : 'text-gray-900'}`}
-              >
+              <div className={`font-medium truncate ${dark ? 'text-zinc-100' : 'text-gray-900'}`}>
                 {address}
               </div>
               <div className={`text-sm mt-0.5 ${dark ? 'text-zinc-500' : 'text-gray-500'}`}>
@@ -136,8 +133,15 @@ export default function RecentMatches({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-3">
+              <OfferCTA
+                address={address}
+                price={price}
+                acres={acres}
+                isLand={isLand}
+                variant="chip"
+              />
               <span
-                className={`text-xs px-2.5 py-1 rounded-full uppercase tracking-wide ${
+                className={`text-xs px-2.5 py-1 rounded-full uppercase tracking-wide hidden sm:inline ${
                   channel === 'sms'
                     ? dark
                       ? 'bg-emerald-950 text-emerald-400 border border-emerald-900'

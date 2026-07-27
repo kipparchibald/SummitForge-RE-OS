@@ -16,10 +16,6 @@ type NavGroup = {
   items: NavItem[];
 };
 
-/**
- * World-class IA: grouped by job-to-be-done, not a flat dump of routes.
- * Command · Inventory · Land & GIS · Pipeline · Growth · System
- */
 export const NAV_GROUPS: NavGroup[] = [
   {
     id: 'command',
@@ -37,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/alerts', label: 'Property Alerts' },
       { href: '/analytics', label: 'Analytics' },
       { href: '/cma', label: 'CMA Builder' },
+      { href: '/offer', label: 'Offer Engine', hint: 'Win odds', highlight: true },
     ],
   },
   {
@@ -91,6 +88,7 @@ const ICONS: Record<string, string> = {
   '/alerts': '◎',
   '/analytics': '▴',
   '/cma': '▣',
+  '/offer': '◎',
   '/development/plat': '⬡',
   '/development/land-deals': '▤',
   '/monitoring': '⌖',
