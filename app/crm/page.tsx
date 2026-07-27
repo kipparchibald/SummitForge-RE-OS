@@ -11,6 +11,12 @@ import {
   type CrmContact,
   type CrmStage,
 } from '@/lib/crm/store';
+import NurturePanel from '@/components/crm/NurturePanel';
+import {
+  enrollContact,
+  sequencesForStage,
+  type NurtureSequence,
+} from '@/lib/nurture/sequences';
 
 const money = (n?: number) =>
   n != null
@@ -23,6 +29,7 @@ export default function CrmPage() {
   const [filter, setFilter] = useState<CrmStage | 'all'>('all');
   const [aiReply, setAiReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const [nurtureToast, setNurtureToast] = useState('');
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -33,8 +40,7 @@ export default function CrmPage() {
   });
 
   useEffect(() => {
-    const list = loadContacts();
-    setContacts(list);
+    setContacts(loadContacts());
   }, []);
 
   const persist = (list: CrmContact[]) => {
@@ -53,9 +59,15 @@ export default function CrmPage() {
     return m;
   }, [contacts]);
 
-  const openPipeline = contacts.filter(
-    (c) => !['closed', 'lost'].includes(c.stage)
-  ).length;
+  const openPipeline = contacts.filter((c) => !['closed', 'lost'].includes(c.stage)).length;
+
+  const stageSequences: NurtureSequence[] = selected
+    ? sequencesForStage(
+        (['lead', 'qualified', 'nurture', 'active', 'under_contract', 'closed'].includes(selected.stage)
+          ? selected.stage
+          : 'lead') as NurtureSequence['triggerStage']
+      )
+    : [];
 
   const addContact = () => {
     if (!form.name.trim()) return;
@@ -83,6 +95,18 @@ export default function CrmPage() {
     persist(list);
     const next = list.find((c) => c.id === id) || null;
     setSelected(next);
+  };
+
+  const enrollSelected = (sequenceId: string) => {
+    if (!selected) return;
+    enrollContact(selected.id, sequenceId);
+    const seqName = stageSequences.find((s) => s.id === sequenceId)?.name || sequenceId;
+    update(selected.id, {
+      notes: [...selected.notes, `Enrolled in nurture: ${seqName}`],
+      stage: selected.stage === 'lead' ? 'nurture' : selected.stage,
+    });
+    setNurtureToast(`Enrolled ${selected.name} in “${seqName}”`);
+    setTimeout(() => setNurtureToast(''), 3500);
   };
 
   const qualifyWithAi = async (c: CrmContact) => {
@@ -150,6 +174,12 @@ export default function CrmPage() {
           </Link>
         </div>
       </div>
+
+      {nurtureToast && (
+        <div className="mb-4 text-sm px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+          {nurtureToast}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <Kpi label="Open pipeline" value={String(openPipeline)} />
@@ -222,7 +252,9 @@ export default function CrmPage() {
             </button>
           </div>
 
-          <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+          <NurturePanel />
+
+          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
             {filtered.length === 0 && (
               <div className="text-center py-10 text-gray-400 border border-dashed rounded-2xl text-sm">
                 No contacts in this stage
@@ -289,10 +321,7 @@ export default function CrmPage() {
                 <Info label="Areas" value={selected.areas.join(', ') || '—'} />
                 <Info label="Source" value={selected.source || '—'} />
                 <Info label="Score" value={selected.score != null ? String(selected.score) : '—'} />
-                <Info
-                  label="Updated"
-                  value={new Date(selected.updatedAt).toLocaleDateString()}
-                />
+                <Info label="Updated" value={new Date(selected.updatedAt).toLocaleDateString()} />
                 <Info label="Interest" value={selected.interest} />
               </div>
 
@@ -323,19 +352,34 @@ export default function CrmPage() {
                     </option>
                   ))}
                 </select>
-                <Link
-                  href="/cma"
-                  className="px-4 py-2 border rounded-xl text-sm hover:bg-gray-50"
-                >
+                <Link href="/cma" className="px-4 py-2 border rounded-xl text-sm hover:bg-gray-50">
                   Run CMA
                 </Link>
-                <Link
-                  href="/development/plat"
-                  className="px-4 py-2 border rounded-xl text-sm hover:bg-gray-50"
-                >
-                  AI Plat
+                <Link href="/portal" className="px-4 py-2 border rounded-xl text-sm hover:bg-gray-50">
+                  Client portal
                 </Link>
               </div>
+
+              {stageSequences.length > 0 && (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                  <div className="text-sm font-semibold text-amber-900 mb-2">Quick enroll nurture</div>
+                  <div className="flex flex-wrap gap-2">
+                    {stageSequences.map((seq) => (
+                      <button
+                        key={seq.id}
+                        type="button"
+                        onClick={() => enrollSelected(seq.id)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-50"
+                      >
+                        {seq.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-700/80 mt-2">
+                    SMS-first drips · uses phone when email is missing
+                  </p>
+                </div>
+              )}
 
               {aiReply && (
                 <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl text-sm text-blue-900 whitespace-pre-wrap">
@@ -373,9 +417,7 @@ function Kpi({ label, value, accent }: { label: string; value: string; accent?: 
       }`}
     >
       <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
-      <div className={`text-2xl font-semibold mt-0.5 ${accent ? 'text-emerald-900' : ''}`}>
-        {value}
-      </div>
+      <div className={`text-2xl font-semibold mt-0.5 ${accent ? 'text-emerald-900' : ''}`}>{value}</div>
     </div>
   );
 }
@@ -396,7 +438,9 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-        active ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+        active
+          ? 'bg-gray-900 text-white border-gray-900'
+          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
       }`}
     >
       {label} <span className="opacity-70">{count}</span>
