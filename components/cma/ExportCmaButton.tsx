@@ -4,6 +4,7 @@ import React from 'react';
 import { exportCmaPdf } from '@/lib/cma/export';
 import type { CmaResult } from '@/lib/cma/engine';
 import { loadPersistedBranding } from '@/lib/branding/apply';
+import { toastSuccess, toastError } from '@/lib/toast/store';
 
 const DEFAULTS = {
   agentName: 'Kipp Archibald',
@@ -20,20 +21,25 @@ export default function ExportCmaButton({
   className?: string;
 }) {
   const onExport = () => {
-    const brand = loadPersistedBranding();
-    const company = brand?.companyName || DEFAULTS.brokerage;
-    exportCmaPdf(result, {
-      agentName: DEFAULTS.agentName,
-      brokerage: company,
-      phone: brand?.phone || DEFAULTS.phone,
-      email: DEFAULTS.email,
-      logoText: company
-        .split(/\s+/)
-        .map((w) => w[0])
-        .join('')
-        .slice(0, 3)
-        .toUpperCase(),
-    });
+    try {
+      const brand = loadPersistedBranding();
+      const company = brand?.companyName || DEFAULTS.brokerage;
+      exportCmaPdf(result, {
+        agentName: DEFAULTS.agentName,
+        brokerage: company,
+        phone: brand?.phone || DEFAULTS.phone,
+        email: DEFAULTS.email,
+        logoText: company
+          .split(/\s+/)
+          .map((w) => w[0])
+          .join('')
+          .slice(0, 3)
+          .toUpperCase(),
+      });
+      toastSuccess('CMA PDF exported');
+    } catch (e: any) {
+      toastError(e?.message || 'Export failed');
+    }
   };
 
   return (
