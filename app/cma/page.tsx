@@ -13,6 +13,7 @@ import ParcelAerialMap from '@/components/cma/ParcelAerialMap';
 import ExportCmaButton from '@/components/cma/ExportCmaButton';
 import CmaOfferLink from '@/components/cma/CmaOfferLink';
 import CmaResultStats from '@/components/cma/CmaResultStats';
+import SubjectPresets, { PRESET_LAND } from '@/components/cma/SubjectPresets';
 
 const money = (n: number) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -33,13 +34,7 @@ const DEMO_COMPS: CompProperty[] = [
   { address: '48 N 2nd E, Rexburg, ID', price: 379000, sqft: 1540, beds: 3, baths: 2, propertyType: 'Single Family', distanceMi: 8.1, status: 'Sold', soldDate: '2025-12-08' },
 ];
 
-const DEFAULT_SUBJECT: SubjectProperty = {
-  address: '12.5 acres near Rigby, ID',
-  listPrice: 650000,
-  acres: 12.5,
-  propertyType: 'Land',
-  city: 'Rigby',
-};
+const DEFAULT_SUBJECT: SubjectProperty = PRESET_LAND;
 
 export default function CMABuilder() {
   const [subject, setSubject] = useState<SubjectProperty>(DEFAULT_SUBJECT);
@@ -75,6 +70,14 @@ export default function CMABuilder() {
 
   const result = useMemo(() => (ran ? runCma(subject, comps, 5) : null), [ran, subject, comps]);
   const isResidential = /single|family|home|new construction|condo|town/i.test(subject.propertyType || '');
+
+  const applyPreset = (next: SubjectProperty) => {
+    setSubject(next);
+    setRan(false);
+    setGisHandoff(null);
+    clearGisCmaHandoff();
+    setStatus(`Demo subject: ${next.address} (${next.propertyType}). Click Run CMA.`);
+  };
 
   const pullNavicaComps = async () => {
     setLoading(true);
@@ -259,6 +262,9 @@ export default function CMABuilder() {
         <div className="lg:col-span-1 space-y-4">
           <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-3">
             <div className="text-sm font-semibold text-gray-800">Subject property</div>
+            {!gisHandoff && (
+              <SubjectPresets subject={subject} onSelect={applyPreset} />
+            )}
             {!hydrated && <p className="text-xs text-slate-400">Loading GIS session…</p>}
             <Field label="Address" value={subject.address} onChange={(v) => setSubject((s) => ({ ...s, address: v }))} />
             <Field label="City (match boost)" value={subject.city || ''} onChange={(v) => setSubject((s) => ({ ...s, city: v }))} />
@@ -329,7 +335,7 @@ export default function CMABuilder() {
               <p className="text-sm mt-1 max-w-md mx-auto">
                 {gisHandoff
                   ? 'GIS subject loaded with year built and assessed value. Pull Navica comps if needed, then Run CMA.'
-                  : 'Select a parcel on GIS → Send to CMA, or enter the subject manually, then Run CMA.'}
+                  : 'Pick a demo subject (Land / Home / NC), or select a parcel on GIS → Send to CMA, then Run CMA.'}
               </p>
             </div>
           ) : (
