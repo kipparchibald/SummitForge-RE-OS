@@ -3,8 +3,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import RecentMatches from '@/components/RecentMatches';
+import DashboardHealthBar from '@/components/DashboardHealthBar';
+import StatusRow from '@/components/ui/StatusRow';
 import { getAlerts, getMatches, isSupabaseConfigured } from '@/lib/alerts/supabase-store';
 import { applyBrandTokens, DEFAULT_BRAND } from '@/lib/theme/tokens';
+import { startRealtime } from '@/lib/realtime/client';
 
 function greetingForHour(hour: number): string {
   if (hour < 12) return 'Good morning';
@@ -14,7 +17,8 @@ function greetingForHour(hour: number): string {
 
 function openTransactionCount(): number {
   try {
-    const raw = localStorage.getItem('sf_transactions');
+    const raw =
+      localStorage.getItem('sf_transactions_v2') || localStorage.getItem('sf_transactions');
     if (!raw) return 0;
     const list = JSON.parse(raw) as { status?: string }[];
     return list.filter((t) => t.status && t.status !== 'closed').length;
@@ -40,18 +44,22 @@ export default function DashboardPage() {
     try {
       applyBrandTokens(DEFAULT_BRAND);
     } catch {
-      /* theme optional */
+      /* */
+    }
+    try {
+      startRealtime();
+    } catch {
+      /* */
     }
     try {
       setStoreMode(isSupabaseConfigured() ? 'supabase' : 'local');
     } catch {
       setStoreMode('local');
     }
-
     try {
       setAutoImportEnabled(localStorage.getItem('sf_auto_import') === '1');
     } catch {
-      /* ignore */
+      /* */
     }
 
     const tick = () => {
@@ -99,7 +107,7 @@ export default function DashboardPage() {
       try {
         localStorage.setItem('sf_auto_import', next ? '1' : '0');
       } catch {
-        /* ignore */
+        /* */
       }
       return next;
     });
@@ -107,19 +115,25 @@ export default function DashboardPage() {
 
   const navicaConfigured = health?.navica?.configured;
   const schemaOk = health?.supabase?.schemaOk;
-  const healthMode = health?.mode === 'demo' ? 'Demo' : health?.mode === 'production' ? 'Live' : '—';
+  const twilioOk = health?.twilio?.configured;
+  const aiLive = health?.ai?.live;
 
   const statusItems = useMemo(
     () => [
-      { label: 'Matching Engine', status: 'ready' as const },
-      { label: 'SMS Notifications', status: 'ready' as const },
-      {
-        label: 'Supabase',
-        status: (storeMode === 'supabase' ? 'ready' : 'optional') as 'ready' | 'optional',
-      },
       {
         label: 'Navica Feed',
         status: (navicaConfigured ? 'ready' : 'optional') as 'ready' | 'optional',
+        detail: navicaConfigured ? 'Live IDX' : 'Demo board',
+      },
+      {
+        label: 'SMS / Twilio',
+        status: (twilioOk ? 'ready' : 'optional') as 'ready' | 'optional',
+        detail: twilioOk ? 'Live send' : 'Simulated',
+      },
+      {
+        label: 'Supabase',
+        status: (storeMode === 'supabase' ? 'ready' : 'optional') as 'ready' | 'optional',
+        detail: storeMode === 'supabase' ? 'Connected' : 'Local mode',
       },
       {
         label: 'Schema (visibility)',
@@ -127,50 +141,29 @@ export default function DashboardPage() {
           | 'ready'
           | 'optional'
           | 'todo',
+        detail: schemaOk === false ? 'Migration needed' : schemaOk ? 'OK' : 'Unknown',
       },
-      { label: 'Idaho Forms', status: 'ready' as const },
-      { label: 'GIS Monitor', status: 'ready' as const },
-      { label: 'Land Engine', status: 'ready' as const },
+      {
+        label: 'AI Assistants',
+        status: (aiLive ? 'ready' : 'optional') as 'ready' | 'optional',
+        detail: aiLive ? health?.ai?.provider || 'Live' : 'Demo responses',
+      },
+      { label: 'Matching Engine', status: 'ready' as const, detail: 'Ready' },
+      { label: 'Idaho Forms', status: 'ready' as const, detail: 'Ready' },
+      { label: 'GIS Monitor', status: 'ready' as const, detail: 'Ready' },
+      { label: 'Land Engine', status: 'ready' as const, detail: 'Ready' },
     ],
-    [storeMode, navicaConfigured, schemaOk]
+    [storeMode, navicaConfigured, schemaOk, twilioOk, aiLive, health?.ai?.provider]
   );
 
   return (
-    <div className="min-h-[calc(100vh-60px)] bg-zinc-950 text-white -mt-0">
+    <div className="min-h-[calc(100vh-60px)] bg-zinc-950 text-white">
       <div className="p-6 lg:p-8 space-y-8 max-w-[1600px] mx-auto">
-        {/* Status strip (no second app chrome — shell already provides nav) */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border ${
-                navicaConfigured
-                  ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800'
-                  : 'bg-zinc-900 text-zinc-400 border-zinc-700'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  navicaConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-500'
-                }`}
-              />
-              {navicaConfigured ? 'Navica Live' : 'Navica Demo'}
-            </span>
-            {health && (
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border ${
-                  schemaOk
-                    ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900'
-                    : 'bg-amber-950/40 text-amber-400 border-amber-900'
-                }`}
-              >
-                Schema {schemaOk ? 'OK' : 'Needs Migration'}
-              </span>
-            )}
-            <span className="inline-flex items-center px-3 py-1.5 rounded-full font-medium border border-zinc-800 bg-zinc-900 text-zinc-400">
-              {storeMode === 'supabase' ? 'Supabase' : 'Local'} store · {healthMode}
-            </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <DashboardHealthBar />
             {clock && (
-              <span className="hidden sm:inline text-zinc-600 px-2">{clock}</span>
+              <span className="hidden sm:inline text-zinc-600 text-xs px-2">{clock}</span>
             )}
           </div>
 
@@ -284,10 +277,10 @@ export default function DashboardPage() {
                     CRM
                   </Link>
                   <Link
-                    href="/cma"
+                    href="/transactions"
                     className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-sm font-medium transition"
                   >
-                    CMA
+                    Transactions
                   </Link>
                 </div>
               </div>
@@ -319,8 +312,8 @@ export default function DashboardPage() {
                 <QuickLink href="/import" label="Import / Navica Pull" desc="Live IDX + CSV + matching" />
                 <QuickLink href="/marketing" label="Marketing Agent" desc="Build · approve · deploy campaigns" />
                 <QuickLink href="/ai-assistants" label="AI Assistants" desc="Valuation, marketing, council" />
-                <QuickLink href="/transactions" label="Transaction Coordinator" desc="Deals, timelines, Idaho forms" />
-                <QuickLink href="/portal" label="Client Portal" desc="Buyer dashboard + voice" />
+                <QuickLink href="/transactions" label="Transaction Coordinator" desc="Deals, checklists, Idaho forms" />
+                <QuickLink href="/portal" label="Client Portal" desc="Buyer dashboard + showings" />
               </div>
             </div>
 
@@ -328,7 +321,12 @@ export default function DashboardPage() {
               <h3 className="font-semibold mb-4">System Status</h3>
               <div className="space-y-3 text-sm">
                 {statusItems.map((item) => (
-                  <StatusRow key={item.label} label={item.label} status={item.status} />
+                  <StatusRow
+                    key={item.label}
+                    label={item.label}
+                    status={item.status}
+                    detail={item.detail}
+                  />
                 ))}
               </div>
               <Link
@@ -385,19 +383,5 @@ function QuickLink({ href, label, desc }: { href: string; label: string; desc: s
         <div className="text-xs text-zinc-500">{desc}</div>
       </div>
     </Link>
-  );
-}
-
-function StatusRow({ label, status }: { label: string; status: 'ready' | 'optional' | 'todo' }) {
-  const map = {
-    ready: { text: 'Ready', class: 'text-emerald-400' },
-    optional: { text: 'Optional', class: 'text-amber-400' },
-    todo: { text: 'Action needed', class: 'text-rose-400' },
-  };
-  return (
-    <div className="flex justify-between items-center">
-      <span className="text-zinc-400">{label}</span>
-      <span className={`font-medium ${map[status].class}`}>{map[status].text}</span>
-    </div>
   );
 }
