@@ -12,6 +12,7 @@ import {
   type CrmStage,
 } from '@/lib/crm/store';
 import NurturePanel from '@/components/crm/NurturePanel';
+import ShowingInbox from '@/components/crm/ShowingInbox';
 import {
   enrollContact,
   sequencesForStage,
@@ -152,8 +153,7 @@ export default function CrmPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">CRM Pipeline</h1>
           <p className="text-gray-600 mt-1">
-            Leads, nurture, and active buyers — linked to alerts, transactions, portal, and AI
-            qualification.
+            Leads, nurture, showings, and active buyers — linked to alerts, portal, and AI.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -251,6 +251,8 @@ export default function CrmPage() {
               + Add to pipeline
             </button>
           </div>
+
+          <ShowingInbox />
 
           <NurturePanel />
 
