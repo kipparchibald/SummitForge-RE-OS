@@ -106,7 +106,7 @@ export default function FormSimplicitySignPage() {
 
       <main className="max-w-3xl mx-auto p-4 sm:p-8 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-900">
-          This is SummitForge’s <strong>Form Simplicity–style</strong> signing experience for demos
+          This is Voxli’s <strong>Form Simplicity–style</strong> signing experience for demos
           and training. Production legal IAR forms can also be completed in{' '}
           <a
             href={room.formSimplicityLaunchUrl}

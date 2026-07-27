@@ -617,7 +617,7 @@ export function buildCertificateOfAuthenticity(pkg: SignaturePackage): Certifica
         action: 'signed',
         timestamp: s.signedAt,
         ipAddress: s.ipAddress || 'demo-session',
-        userAgent: s.userAgent || 'SummitForge E-Sign Demo',
+        userAgent: s.userAgent || 'Voxli E-Sign Demo',
       });
     }
   }
@@ -638,12 +638,12 @@ export function buildCertificateOfAuthenticity(pkg: SignaturePackage): Certifica
     'This Certificate of Authenticity documents the electronic signing events for the listed packet. ' +
     'In production, DocuSign (Certificate of Completion) or Adobe Acrobat Sign issues a provider-signed COC/COA with ' +
     'cryptographic seals, certificate authority chains, and verified identity evidence. This demo certificate is for ' +
-    'workflow and audit-trail practice inside SummitForge and is not a substitute for a qualified trust service provider certificate.';
+    'workflow and audit-trail practice inside Voxli and is not a substitute for a qualified trust service provider certificate.';
 
   const fullText = [
     '═══════════════════════════════════════════════════════════',
     '  CERTIFICATE OF AUTHENTICITY (Electronic Signature Packet)',
-    '  SummitForge RE OS · Transaction E-Sign Audit Record',
+    '  Voxli.dev · Transaction E-Sign Audit Record',
     '═══════════════════════════════════════════════════════════',
     '',
     `Certificate ID:     ${coaId}`,
@@ -773,7 +773,7 @@ function persistPackage(pkg: SignaturePackage) {
 /** Mark a signer as signed (demo). Issues COA when all signers complete. */
 export function markSignerSigned(pkg: SignaturePackage, role: SignerRole): SignaturePackage {
   const ua =
-    typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 120) : 'SummitForge E-Sign Demo';
+    typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 120) : 'Voxli E-Sign Demo';
   const signers = pkg.signers.map((s) =>
     s.role === role
       ? {

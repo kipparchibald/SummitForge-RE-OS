@@ -1,6 +1,6 @@
-# AGENTS.md — SummitForge RE OS
+# AGENTS.md — Voxli.dev RE OS
 
-This is the SummitForge real estate operating system.
+This is the **Voxli.dev** real estate operating system (repo may still be named SummitForge-RE-OS).
 
 **Separate product:** IdeaSpeak is a voice-to-app builder in `/Users/kipp/ideaspeak-app`. Do not merge IdeaSpeak builder UI, Sandpack, or voice-refiner product code into this repo. Do not track IdeaSpeak status here.
 

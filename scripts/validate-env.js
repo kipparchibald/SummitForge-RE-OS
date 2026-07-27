@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * .env / build-time validation script for SummitForge RE OS.
+ * .env / build-time validation script for Voxli.dev RE OS.
  * Run manually: npm run validate:env
  * Wired into "build" for deploy safety.
  *
@@ -60,7 +60,7 @@ function validate() {
   return { demo, warnings, missing };
 }
 
-console.log('\n[SummitForge] Running env validation (deploy prep)...');
+console.log('\n[Voxli] Running env validation (deploy prep)...');
 
 const res = validate();
 
@@ -84,6 +84,6 @@ console.log('    2. Set CRON_SECRET (random) to activate hourly background sync'
 console.log('    3. Add real Navica + Supabase + Stripe for full live/prod');
 console.log('    4. npm run validate:env (or auto on build)');
 
-console.log('\n[SummitForge] Env validation complete. Build will proceed.\n');
+console.log('\n[Voxli] Env validation complete. Build will proceed.\n');
 
 process.exit(0);

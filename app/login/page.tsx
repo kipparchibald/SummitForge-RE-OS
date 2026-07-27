@@ -60,9 +60,9 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="font-semibold text-3xl tracking-tight" style={{ color: 'var(--primary)' }} data-company-name>
-            SummitForge
+            Voxli.dev
           </div>
-          <div className="text-sm text-gray-500 mt-1" data-tagline>RE OS • Jefferson County / Eastern Idaho</div>
+          <div className="text-sm text-gray-500 mt-1" data-tagline>RE OS · Eastern Idaho</div>
         </div>
 
         <form onSubmit={signInWithPassword} className="card p-6 space-y-4">

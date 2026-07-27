@@ -133,7 +133,7 @@ export default function PricingPage() {
 
     const logEntry = `[${timestamp}] Demo checkout initiated for ${tierName} (${price}) — using Stripe key: ${stripePublishable.slice(0, 12)}...`;
     
-    console.log('[SummitForge Pricing] Simulating Stripe checkout:', {
+    console.log('[Voxli Pricing] Simulating Stripe checkout:', {
       tier: tierName,
       price,
       publishableKey: stripePublishable,

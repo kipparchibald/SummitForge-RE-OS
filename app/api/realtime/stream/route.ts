@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         channel: 'system',
         type: 'HEALTH',
         payload: {
-          message: 'SummitForge realtime SSE connected',
+          message: 'Voxli realtime SSE connected',
           supabaseLive: !!(process.env.NEXT_PUBLIC_SUPABASE_URL && !String(process.env.NEXT_PUBLIC_SUPABASE_URL).includes('demo')),
         },
         at: new Date().toISOString(),

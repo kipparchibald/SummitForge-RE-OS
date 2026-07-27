@@ -1,9 +1,10 @@
-# SummitForge RE OS
+# Voxli.dev (RE OS)
 
 **Real Estate Operating System for Jefferson County / Eastern Idaho**  
 Focus: Raw land, development, subdivisions, and AI-powered brokerage operations.
 
-> **Product boundary:** SummitForge is this RE OS only. **IdeaSpeak** (voice → app builder) is a separate product/repo — do not merge the two.
+> **Product name:** **Voxli.dev** (user-facing). This repo may still use historical `SummitForge-RE-OS` paths.  
+> **Product boundary:** This is the RE OS only. **IdeaSpeak** (voice → app builder) is a separate product/repo — do not merge the two.
 
 ## Current State (July 2026)
 - Polished Next.js 15 dashboard with sidebar nav and white-label theming

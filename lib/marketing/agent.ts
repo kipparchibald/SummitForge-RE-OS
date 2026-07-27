@@ -20,7 +20,7 @@ export type { MarketingPlan } from './types';
 
 const CAMPAIGN_SYSTEM = `${SYSTEM_PROMPTS.marketing}
 
-You are also the autonomous campaign architect for SummitForge RE OS.
+You are also the autonomous campaign architect for Voxli.dev RE OS.
 When given a property brief, produce a concise strategy memo (not JSON) covering:
 1) Campaign concept (one sentence)
 2) Primary and secondary audiences

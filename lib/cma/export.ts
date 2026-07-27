@@ -507,7 +507,7 @@ export function buildCmaHtml(result: CmaResult, opts: CmaExportOptions = {}): st
     </footer>
 
     <p class="disclaimer">
-      This comparative market analysis is a planning tool prepared with SummitForge for internal pricing strategy.
+      This comparative market analysis is a planning tool prepared with Voxli.dev for internal pricing strategy.
       It is not a formal appraisal and should not be relied upon as a certified valuation of real property.
     </p>
   </div>

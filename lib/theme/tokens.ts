@@ -1,5 +1,7 @@
-// Summit Forge - Branding / white-label theme tokens
+// Voxli.dev - Branding / white-label theme tokens
 // Used by settings/branding page and layout for multi-tenant theming
+
+import { PRODUCT_BRAND } from '@/lib/product'
 
 export interface BrandTokens {
   primary: string
@@ -21,7 +23,7 @@ export const DEFAULT_BRAND: BrandTokens = {
   foreground: '#111827',
   muted: '#6b7280',
   radius: '1rem',
-  appName: 'Summit Forge',
+  appName: PRODUCT_BRAND,
 }
 
 /**

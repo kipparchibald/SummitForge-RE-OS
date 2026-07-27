@@ -9,10 +9,11 @@ import MobileNav from '@/components/MobileNav'
 import { AppNavLinks } from '@/components/AppNavLinks'
 import GlobalToasts from '@/components/GlobalToasts'
 import { BrandPhone, BrandText } from '@/components/BrandText'
+import { PRODUCT_BRAND, PRODUCT_DESCRIPTION, PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/product'
 
 export const metadata = {
-  title: 'SummitForge RE OS',
-  description: 'Real Estate Operating System for Eastern Idaho - Raw Land, Development & AI-Powered Tools',
+  title: `${PRODUCT_BRAND} · RE OS`,
+  description: PRODUCT_DESCRIPTION,
   icons: { icon: '/favicon.ico' },
 }
 
@@ -25,8 +26,8 @@ export default function RootLayout({
   const envStatus = validateEnv();
   const brand = deploymentBranding();
   const brandCss = deploymentBrandCssText(brand);
-  const companyFallback = brand.companyName || 'SummitForge';
-  const taglineFallback = brand.tagline || 'RE OS · Eastern Idaho';
+  const companyFallback = brand.companyName || PRODUCT_BRAND;
+  const taglineFallback = brand.tagline || PRODUCT_TAGLINE;
   const phoneFallback = brand.phone || '(208) 745-5911';
 
   return (
@@ -41,7 +42,7 @@ export default function RootLayout({
         {/*
           Pre-hydration script: CSS vars + live badge only.
           Do NOT mutate company/tagline/phone text here — that races React hydration
-          when localStorage branding differs from server env (Archibald vs SummitForge).
+          when localStorage branding differs from server env (tenant vs Voxli.dev).
           Text labels are applied after mount via BrandText / BrandPhone.
         */}
         <script

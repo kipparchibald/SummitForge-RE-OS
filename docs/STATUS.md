@@ -1,7 +1,7 @@
-# SummitForge RE OS — Build Status
+# Voxli.dev RE OS — Build Status
 
-**Product:** Real estate operating system (land, development, brokerage, AI agents)  
-**Repo:** `SummitForge-RE-OS` only  
+**Product:** **Voxli.dev** — real estate operating system (land, development, brokerage, AI agents)  
+**Repo:** `SummitForge-RE-OS` (historical path; user-facing brand is Voxli.dev)
 **Stack:** Next.js 15 + Supabase + domain agents  
 
 **Not this product:** IdeaSpeak (`ideaspeak-app`) is a separate voice-first *app builder*. Do not merge IdeaSpeak features or status into this repo.

@@ -58,7 +58,7 @@ const DEMO_DEAL_PATCH: Partial<CoverLetterDeal> = {
   buyerName: 'Jordan Mitchell',
   buyerEmail: 'jordan.mitchell@example.com',
   buyerPhone: '(208) 555-0142',
-  sellerName: 'Summit Forge Seller LLC',
+  sellerName: 'Demo Seller LLC',
   sellerEmail: 'seller@example.com',
   propertyKind: 'Residential',
   address: '789 Lindy Lane',
@@ -261,7 +261,7 @@ export default function FormsPage() {
   const launchFs = () => {
     openFormSimplicityPortal(room || undefined);
     setStatus(
-      `Opened Form Simplicity portal (${formSimplicityPortalUrl()}). Prepare in SummitForge → finish legal e-sign there when preferred.`
+      `Opened Form Simplicity portal (${formSimplicityPortalUrl()}). Prepare in Voxli → finish legal e-sign there when preferred.`
     );
   };
 

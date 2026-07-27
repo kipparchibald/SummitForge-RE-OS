@@ -22,7 +22,7 @@ export function buildSmsMessage(alert: Alert, listing: Listing, score?: number):
   const address = listing.address || listing.city;
   const scorePart = score != null ? ` (${Math.round(score)}%)` : '';
 
-  return `SummitForge: Match for "${alert.name}"${scorePart}\n${address} • ${price}${acres}\nReply STOP to pause.`;
+  return `Voxli: Match for "${alert.name}"${scorePart}\n${address} • ${price}${acres}\nReply STOP to pause.`;
 }
 
 /**

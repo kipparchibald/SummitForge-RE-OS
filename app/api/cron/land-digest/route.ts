@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
           <td style="padding:6px 8px;text-align:right;color:${d.spread >= 0 ? '#3d6b3d' : '#a33'};font-weight:700">
             ${d.spread >= 0 ? '+' : '-'}$${Math.abs(Math.round(d.spread)).toLocaleString()}</td></tr>`).join('');
       const html = `<div style="font-family:Arial,sans-serif;color:#222;max-width:720px">
-        <h2 style="color:#1F4E5F;margin-bottom:2px">SummitForge — Land Deals That Pencil</h2>
+        <h2 style="color:#1F4E5F;margin-bottom:2px">Voxli.dev — Land Deals That Pencil</h2>
         <p style="color:#666;font-size:13px;margin-top:0">${new Date(result.scannedAt).toLocaleString()} · ${result.listingsScanned} scanned · <b>${result.penciling.length} pencil</b></p>
         <table style="border-collapse:collapse;width:100%;font-size:13px;border:1px solid #ddd">
         <thead><tr style="background:#1F4E5F;color:#fff">
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         const r = await fetch('https://api.resend.com/emails', {
           method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ from, to: to.split(',').map(s => s.trim()),
-            subject: `SummitForge land digest — ${result.penciling.length} deals pencil`, html }),
+            subject: `Voxli land digest — ${result.penciling.length} deals pencil`, html }),
         });
         emailed = r.ok;
       } catch (e: any) { console.log('[land-digest] email skipped:', e?.message); }

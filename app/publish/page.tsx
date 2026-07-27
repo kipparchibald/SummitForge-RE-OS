@@ -14,8 +14,8 @@ const TENANTS = [
   },
   {
     id: 'generic',
-    name: 'Summit Forge White-Label',
-    domain: 'yourbrokerage.summitforge.app',
+    name: 'Voxli White-Label',
+    domain: 'yourbrokerage.voxli.dev',
     primary: '#1e3a5f',
     accent: '#3b82f6',
     tagline: 'AI Real Estate OS for modern brokerages',
@@ -23,10 +23,10 @@ const TENANTS = [
   {
     id: 'demo',
     name: 'Demo Realty Group',
-    domain: 'demo.summitforge.app',
+    domain: 'demo.voxli.dev',
     primary: '#4c1d95',
     accent: '#a78bfa',
-    tagline: 'Powered by Summit Forge',
+    tagline: 'Powered by Voxli.dev',
   },
 ];
 
@@ -82,7 +82,7 @@ export default function PublishPage() {
     const blob = new Blob([JSON.stringify(tenantConfig, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `summitforge-tenant-${tenantConfig.tenant}.json`;
+    a.download = `voxli-tenant-${tenantConfig.tenant}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
   };

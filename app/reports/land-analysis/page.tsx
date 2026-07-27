@@ -95,7 +95,7 @@ export default function LandAnalysisReport() {
         <header className="flex items-start justify-between border-b-2 pb-4 mb-6" style={{ borderColor: 'var(--primary)' }}>
           <div>
             <div className="text-2xl font-bold tracking-tight" style={{ color: 'var(--primary)' }} data-company-name>
-              SummitForge
+              Voxli.dev
             </div>
             <div className="text-[11px] uppercase tracking-widest text-gray-500 mt-0.5">
               Land Development Analysis
@@ -284,7 +284,7 @@ export default function LandAnalysisReport() {
             or utility capacity. Figures are estimates and subject to change with market conditions.
           </p>
           <p className="text-[10px] leading-relaxed text-gray-600 mt-2">
-            Prepared by Archibald-Bagley Real Estate · Rigby, Idaho · Generated {generatedAt || 'on request'} by SummitForge RE OS.
+            Prepared by Archibald-Bagley Real Estate · Rigby, Idaho · Generated {generatedAt || 'on request'} by Voxli.dev.
           </p>
         </section>
       </article>

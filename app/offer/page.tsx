@@ -127,7 +127,7 @@ function OfferDecisionInner() {
       decision.escalationAdvice ? `\n${decision.escalationAdvice}` : '',
       ``,
       `Suggested band: ${money(decision.recommendedPriceLow)} – ${money(decision.recommendedPriceHigh)}`,
-      `— SummitForge Offer Decision Engine · Archibald-Bagley`,
+      `— Voxli Offer Decision Engine · Archibald-Bagley`,
     ]
       .filter(Boolean)
       .join('\n');

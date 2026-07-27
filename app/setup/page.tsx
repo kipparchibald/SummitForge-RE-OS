@@ -9,7 +9,7 @@ export default function SetupGuide() {
   const [completed, setCompleted] = useState(false);
 
   const steps = [
-    { num: 1, title: 'Welcome to SummitForge', desc: 'Your complete RE OS for Jefferson County raw land & development.' },
+    { num: 1, title: 'Welcome to Voxli.dev', desc: 'Your complete RE OS for Jefferson County raw land & development.' },
     { num: 2, title: 'Connect Your Brand', desc: 'Go to Branding settings. Pick colors and name. Instantly white-label ready.' },
     { num: 3, title: 'Try the AI Assistants', desc: 'Use Valuation, Marketing, Council, Lead Qualifier, and Transaction agents. All trained on local data.' },
     { num: 4, title: 'Explore Core Tools', desc: 'GIS Monitoring, Import, Analytics, Marketing execution, Client Portal.' },
@@ -27,7 +27,7 @@ export default function SetupGuide() {
     <div className="max-w-3xl mx-auto p-8">
       <div className="mb-6">
         <Link href="/" className="text-sm text-gray-500 hover:underline">← Back to Dashboard</Link>
-        <h1 className="text-4xl font-bold tracking-tighter mt-2">Welcome to SummitForge RE OS</h1>
+        <h1 className="text-4xl font-bold tracking-tighter mt-2">Welcome to Voxli.dev</h1>
         <p className="text-gray-600 mt-1">5-minute guided first-run. Built for agents, teams, and brokerages who focus on raw land and development in Eastern Idaho.</p>
       </div>
 

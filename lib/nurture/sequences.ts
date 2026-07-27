@@ -77,7 +77,7 @@ export const NURTURE_SEQUENCES: NurtureSequence[] = [
       {
         dayOffset: 0,
         channel: 'sms',
-        body: '{{firstName}} — your SummitForge portal is live. New MLS matches for {{area}} will show up there first. Text me anytime to request a showing.',
+        body: '{{firstName}} — your Voxli portal is live. New MLS matches for {{area}} will show up there first. Text me anytime to request a showing.',
       },
       {
         dayOffset: 7,

@@ -4,7 +4,7 @@
 // This is what makes a white-label deployment actually white-label. Branding set
 // in /settings/branding lives in the visitor's own localStorage, so a prospect
 // opening a tenant's URL for the first time has nothing saved and would see
-// stock SummitForge colours. These env vars give each deployment its own
+// stock Voxli colours. These env vars give each deployment its own
 // defaults, rendered server-side so the first paint is already branded.
 //
 // A visitor's saved branding still wins — these are defaults, not a lock.

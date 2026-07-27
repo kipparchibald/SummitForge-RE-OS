@@ -49,7 +49,7 @@ export default function ClientPortalPage() {
   const startVoice = () => {
     setVoiceActive(true);
     setTranscript([
-      'AI: Hi Jordan and Taylor — this is Summit Forge, your Archibald-Bagley assistant.',
+      'AI: Hi Jordan and Taylor — this is Voxli, your Archibald-Bagley assistant.',
       'AI: I see you prefer single-level homes around Rigby under $525k. Shall I walk you through your newest match?',
       'You: Yes, tell me about the layout and any contingencies.',
       'AI: Your top match is single level with wide halls. I can request a private showing or prep a draft offer for Kipp to review.',

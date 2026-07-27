@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * SummitForge smoke tests — pure Node, no Next.js runtime required.
+ * Voxli.dev smoke tests — pure Node, no Next.js runtime required.
  * Run: npm run test:smoke
  *
  * Optional live check (dev/prod server running):
@@ -29,7 +29,7 @@ function assert(condition, message) {
   }
 }
 
-console.log('\n[SummitForge] Running smoke tests...\n');
+console.log('\n[Voxli] Running smoke tests...\n');
 
 // ─── 1. FeedTypes visibility gating (mirrors lib/import/feedTypes.ts) ───
 console.log('1. FeedTypes visibility gating');
@@ -730,7 +730,7 @@ async function liveChecks() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: '+12085550100',
-          body: 'SummitForge smoke test — ignore',
+          body: 'Voxli smoke test — ignore',
           contactName: 'Smoke Test',
         }),
       },
@@ -756,5 +756,5 @@ console.log('  Live:   SMOKE_BASE_URL=http://localhost:3000 npm run test:smoke')
 
 await liveChecks();
 
-console.log('\n[SummitForge] Smoke tests: ' + passed + ' passed, ' + failed + ' failed\n');
+console.log('\n[Voxli] Smoke tests: ' + passed + ' passed, ' + failed + ' failed\n');
 process.exit(failed > 0 ? 1 : 0);

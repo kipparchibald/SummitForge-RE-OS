@@ -1,13 +1,13 @@
 /**
- * Form Simplicity–style e-sign workflow for SummitForge.
+ * Form Simplicity–style e-sign workflow for Voxli.dev.
  *
  * Architecture recommendation (industry practice for MLS/IAR forms):
  * ─────────────────────────────────────────────────────────────────
- *  PREPARE in SummitForge  →  SIGN in Form Simplicity (or in-app mirror)
+ *  PREPARE in Voxli  →  SIGN in Form Simplicity (or in-app mirror)
  *
  *  • LINK OUT (recommended for production legal signing)
  *    - Official IAR forms + compliance live in Form Simplicity
- *    - SummitForge builds cover letter, packet, signers, then
+ *    - Voxli builds cover letter, packet, signers, then
  *      "Open Form Simplicity" / handoff export
  *    - Avoids iframe/X-Frame and SSO embedding issues
  *
@@ -221,7 +221,7 @@ export function createFormSimplicityRoom(
     })),
     message: pkg.message,
     note:
-      'Import or re-key this packet into Form Simplicity. When API credentials exist, SummitForge can POST this payload automatically.',
+      'Import or re-key this packet into Form Simplicity. When API credentials exist, Voxli can POST this payload automatically.',
   };
 
   const portal = formSimplicityPortalUrl();
