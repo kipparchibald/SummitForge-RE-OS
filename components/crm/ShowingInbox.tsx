@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { loadShowingRequests, type ShowingRequest } from '@/lib/portal/matches';
+import { useRealtime } from '@/lib/realtime/hooks';
+import { emitLocal } from '@/lib/realtime/client';
+import StatusBadge from '@/components/ui/StatusBadge';
 
 const SHOWING_KEY = 'sf_portal_showings';
 
@@ -14,16 +17,25 @@ function saveShowings(list: ShowingRequest[]) {
 function updateStatus(id: string, status: ShowingRequest['status']): ShowingRequest[] {
   const all = loadShowingRequests().map((s) => (s.id === id ? { ...s, status } : s));
   saveShowings(all);
+  emitLocal('showings', 'UPDATE', { id, status });
   return all;
 }
 
-/** Agent inbox for client-portal Schedule showing requests. */
+/** Agent inbox — live updates when portal schedules a showing. */
 export default function ShowingInbox() {
   const [items, setItems] = useState<ShowingRequest[]>([]);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     setItems(loadShowingRequests());
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useRealtime('showings', () => {
+    refresh();
+  });
 
   const pending = items.filter((s) => s.status === 'pending');
 
@@ -32,12 +44,10 @@ export default function ShowingInbox() {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="font-semibold text-zinc-900">Showing requests</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">From client portal · Schedule showing</p>
+          <p className="text-xs text-zinc-500 mt-0.5">From client portal · live updates</p>
         </div>
         {pending.length > 0 && (
-          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-100">
-            {pending.length} pending
-          </span>
+          <StatusBadge label={`${pending.length} pending`} tone="warning" pulse />
         )}
       </div>
 

@@ -3,6 +3,8 @@
  * Zillow-style: new MLS matches surface in the portal with schedule CTA.
  */
 
+import { emitLocal } from '@/lib/realtime/client';
+
 export type PortalMatch = {
   id: string;
   address: string;
@@ -61,9 +63,6 @@ export function markMatchSeen(id: string) {
   localStorage.setItem(PORTAL_SEEN_KEY, JSON.stringify([...seen]));
 }
 
-/**
- * Ingest alert matches into the portal feed (called after Navica sync / rematch).
- */
 export function ingestAlertMatches(
   matches: Array<{
     id: string;
@@ -85,6 +84,7 @@ export function ingestAlertMatches(
   const existing = loadPortalMatches();
   const byId = new Map(existing.map((m) => [m.id, m]));
   const seen = getSeenMatchIds();
+  let added = 0;
 
   for (const m of matches) {
     const snap = m.listingSnapshot;
@@ -104,6 +104,7 @@ export function ingestAlertMatches(
       isNew: !seen.has(m.id),
       listingId: m.listingId,
     };
+    if (!byId.has(m.id)) added += 1;
     byId.set(m.id, portal);
   }
 
@@ -111,6 +112,15 @@ export function ingestAlertMatches(
     (a, b) => new Date(b.matchedAt).getTime() - new Date(a.matchedAt).getTime()
   );
   savePortalMatches(merged);
+
+  if (typeof window !== 'undefined' && added > 0) {
+    try {
+      emitLocal('matches', 'SYNC', { count: added, total: merged.length });
+    } catch {
+      /* */
+    }
+  }
+
   return merged;
 }
 
@@ -200,6 +210,11 @@ export function requestShowing(
   all.unshift(req);
   if (typeof window !== 'undefined') {
     localStorage.setItem(SHOWING_KEY, JSON.stringify(all));
+    try {
+      emitLocal('showings', 'INSERT', req);
+    } catch {
+      /* */
+    }
   }
   markMatchSeen(match.id);
   return req;
