@@ -26,6 +26,7 @@ export type PortalMatch = {
 
 const PORTAL_MATCHES_KEY = 'sf_portal_matches';
 const PORTAL_SEEN_KEY = 'sf_portal_seen_matches';
+const SHOWING_KEY = 'sf_portal_showings';
 
 export function loadPortalMatches(): PortalMatch[] {
   if (typeof window === 'undefined') return DEMO_PORTAL_MATCHES;
@@ -180,8 +181,6 @@ export type ShowingRequest = {
   status: 'pending' | 'confirmed' | 'declined';
 };
 
-const SHOWING_KEY = 'sf_portal_showings';
-
 export function loadShowingRequests(): ShowingRequest[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -190,6 +189,12 @@ export function loadShowingRequests(): ShowingRequest[] {
   } catch {
     return [];
   }
+}
+
+/** Explicit local write (used by dual-store). */
+export function saveShowingRequestsLocal(list: ShowingRequest[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(SHOWING_KEY, JSON.stringify(list.slice(0, 200)));
 }
 
 export function requestShowing(
@@ -208,13 +213,17 @@ export function requestShowing(
   };
   const all = loadShowingRequests();
   all.unshift(req);
+  saveShowingRequestsLocal(all);
   if (typeof window !== 'undefined') {
-    localStorage.setItem(SHOWING_KEY, JSON.stringify(all));
     try {
       emitLocal('showings', 'INSERT', req);
     } catch {
       /* */
     }
+    // Fire-and-forget cloud persist when dual-store available
+    void import('@/lib/crm/supabase-store')
+      .then((m) => m.persistShowingAsync(req))
+      .catch(() => {});
   }
   markMatchSeen(match.id);
   return req;
