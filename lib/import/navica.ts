@@ -474,8 +474,9 @@ export async function fetchArchibaldNavicaListings(
     const res = await fetch(url, {
       method: 'GET',
       headers: buildNavicaHeaders(),
+      // Next.js fetch cache hint (not in standard RequestInit types)
       next: { revalidate: 300 },
-    });
+    } as RequestInit);
 
     if (!res.ok) {
       throw new Error(`Navica feed responded ${res.status}`);
