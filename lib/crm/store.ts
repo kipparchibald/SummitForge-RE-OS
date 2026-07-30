@@ -1,6 +1,7 @@
 /**
- * Lightweight agent CRM store (localStorage).
- * Pipeline stages cover lead → closed for Archibald-Bagley style ops.
+ * CRM types + localStorage cache.
+ * Prefer `@/lib/crm/supabase-store` (loadContactsAsync / saveContactsAsync)
+ * for multi-device persistence when Supabase auth is active.
  */
 
 export type CrmStage =
@@ -87,6 +88,7 @@ export const DEMO_CONTACTS: CrmContact[] = [
   },
 ];
 
+/** Synchronous local cache (SSR-safe). Prefer loadContactsAsync when possible. */
 export function loadContacts(): CrmContact[] {
   if (typeof window === 'undefined') return DEMO_CONTACTS;
   try {

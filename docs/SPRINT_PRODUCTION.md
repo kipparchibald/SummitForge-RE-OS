@@ -6,6 +6,8 @@
 
 Do **not** merge IdeaSpeak or Split Rock Construction OS into this repo.
 
+**Deploy identity:** see [DEPLOYMENT.md](./DEPLOYMENT.md) — Production ready on `summit-forge-re-os-voxli.vercel.app`.
+
 ---
 
 ## North star (8 weeks)
@@ -14,9 +16,7 @@ Archibald-Bagley runs **live MLS + durable CRM + portal + SMS** on production; o
 
 ---
 
-## Sprint 0 — Production foundations (now)
-
-See **[SPRINT_0_RUNBOOK.md](./SPRINT_0_RUNBOOK.md)**.
+## Sprint 0 — Production foundations
 
 | ID | Work | Status |
 |----|------|--------|
@@ -44,16 +44,20 @@ Runbook: [NAVICA-GO-LIVE.md](./NAVICA-GO-LIVE.md)
 
 ---
 
-## Sprint 2 — Durable CRM + multi-tenant core
+## Sprint 2 — Durable CRM + showings (in progress)
 
 | ID | Work | Status |
 |----|------|--------|
-| S2.1 | contacts / pipelines / activities / showings tables + RLS | ⬜ |
-| S2.2 | CRM store → Supabase (off localStorage) | ⬜ |
-| S2.3 | Alerts + matches fully server-persisted | ⬜ Partial |
-| S2.4 | Roles: agent / broker / admin | ⬜ |
-| S2.5 | Branding JSON on `brokerages` | ⬜ |
-| S2.6 | Tenant switcher + isolation tests | ⬜ |
+| S2.1 | `crm_contacts` / `showing_requests` / `nurture_enrollments` SQL + RLS | ✅ `schema-crm.sql` |
+| S2.2 | CRM dual-store (local cache + Supabase when signed in) | ✅ `lib/crm/supabase-store.ts` |
+| S2.3 | CRM page async load/save + storage mode badge | ✅ `/crm` |
+| S2.4 | Showings portal → cloud + agent inbox | ✅ |
+| S2.5 | Alerts dual-store already present | ✅ `lib/alerts/supabase-store.ts` |
+| S2.6 | Roles: agent / broker / admin (RLS by brokerage claim) | ⬜ Later |
+| S2.7 | Branding JSON on `brokerages` (not only localStorage) | ⬜ Later |
+
+**You run once:** Supabase SQL Editor → `supabase/schema-crm.sql`  
+Then sign in on prod → CRM header shows **Supabase (synced)**.
 
 ---
 
@@ -70,64 +74,30 @@ Runbook: [NAVICA-GO-LIVE.md](./NAVICA-GO-LIVE.md)
 
 ---
 
-## Sprint 4 — Transactions + forms
+## Sprint 4–6
 
-| ID | Work | Status |
-|----|------|--------|
-| S4.1 | Transactions + checklists on Supabase | ⬜ |
-| S4.2 | RE-21 / RE-14 populate from deal | ⬜ Partial |
-| S4.3 | Form Simplicity or DocuSign primary path | ⬜ |
-| S4.4 | Critical dates + reminders | ⬜ |
-| S4.5 | Transaction AI human-gate only | ⬜ |
-| S4.6 | Audit log | ⬜ |
+See prior board entries: transactions/e-sign, Stripe/white-label, polish.
 
 ---
 
-## Sprint 5 — Monetization + white-label
+## Priority top 10 (remaining)
 
-| ID | Work | Status |
-|----|------|--------|
-| S5.1 | Stripe Checkout + portal + webhooks | ⬜ |
-| S5.2 | Plan entitlements | ⬜ |
-| S5.3 | Usage meters | ⬜ |
-| S5.4 | Publish + tenant onboarding wizard | ⬜ Partial UI |
-| S5.5 | Branded emails/PDFs/SMS footer | ⬜ |
-| S5.6 | Reseller onboarding docs | ⬜ |
-
----
-
-## Sprint 6 — World-class polish
-
-| ID | Work | Status |
-|----|------|--------|
-| S6.1 | Design system pass all routes | ⬜ |
-| S6.2 | Mobile / PWA agent flows | ⬜ |
-| S6.3 | Performance listing + map queries | ⬜ |
-| S6.4 | Public IDX-safe SEO pages | ⬜ |
-| S6.5 | Playwright critical-path CI | ⬜ |
-| S6.6 | Ops runbooks (outages) | ⬜ |
-| S6.7 | Jefferson GIS cert chain (upstream) | ⬜ |
-
----
-
-## Priority top 10
-
-1. Supabase migrations (visibility)  
-2. `DEMO_MODE=false` + real auth  
+1. Apply `schema-crm.sql` on production Supabase  
+2. Confirm CRM cloud badge when signed in  
 3. Navica credentials + backfill  
-4. CRM/alerts off localStorage + RLS  
-5. Twilio live nurture  
-6. Client portal real auth  
-7. Transactions persisted + e-sign  
-8. Stripe live  
-9. Tenant #2 white-label trial  
-10. Mobile polish + E2E CI  
+4. Twilio live nurture  
+5. Client portal real auth  
+6. Transactions persisted + e-sign  
+7. Stripe live  
+8. Tenant #2 white-label trial  
+9. Mobile polish + E2E CI  
+10. RLS by brokerage_id claim  
 
 ---
 
 ## Explicit non-goals
 
 - IdeaSpeak app builder  
-- Voxli / Split Rock construction job OS (separate product)  
+- Voxli / Split Rock construction job OS  
 - Native mobile apps before web PWA is excellent  
 - Full Cesium / drone pipeline at launch  

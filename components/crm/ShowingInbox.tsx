@@ -1,52 +1,44 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { loadShowingRequests, type ShowingRequest } from '@/lib/portal/matches';
+import type { ShowingRequest } from '@/lib/portal/matches';
+import {
+  loadShowingsAsync,
+  updateShowingStatusAsync,
+} from '@/lib/crm/supabase-store';
 import { useRealtime } from '@/lib/realtime/hooks';
-import { emitLocal } from '@/lib/realtime/client';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { toastSuccess, toastInfo } from '@/lib/toast/store';
 
-const SHOWING_KEY = 'sf_portal_showings';
-
-function saveShowings(list: ShowingRequest[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(SHOWING_KEY, JSON.stringify(list));
-}
-
-function updateStatus(id: string, status: ShowingRequest['status']): ShowingRequest[] {
-  const all = loadShowingRequests().map((s) => (s.id === id ? { ...s, status } : s));
-  saveShowings(all);
-  emitLocal('showings', 'UPDATE', { id, status });
-  return all;
-}
-
 /** Agent inbox — live updates when portal schedules a showing. */
 export default function ShowingInbox() {
   const [items, setItems] = useState<ShowingRequest[]>([]);
+  const [mode, setMode] = useState<'cloud' | 'local'>('local');
 
-  const refresh = useCallback(() => {
-    setItems(loadShowingRequests());
+  const refresh = useCallback(async () => {
+    const { showings, mode: m } = await loadShowingsAsync();
+    setItems(showings);
+    setMode(m);
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   useRealtime('showings', () => {
-    refresh();
+    void refresh();
   });
 
   const pending = items.filter((s) => s.status === 'pending');
 
-  const confirm = (id: string, address: string) => {
-    setItems(updateStatus(id, 'confirmed'));
+  const confirm = async (id: string, address: string) => {
+    setItems(await updateShowingStatusAsync(id, 'confirmed'));
     toastSuccess(`Showing confirmed · ${address}`);
   };
 
-  const decline = (id: string, address: string) => {
-    setItems(updateStatus(id, 'declined'));
+  const decline = async (id: string, address: string) => {
+    setItems(await updateShowingStatusAsync(id, 'declined'));
     toastInfo(`Showing declined · ${address}`);
   };
 
@@ -55,7 +47,9 @@ export default function ShowingInbox() {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-semibold text-zinc-900">Showing requests</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">From client portal · live updates</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            From client portal · {mode === 'cloud' ? 'cloud synced' : 'this device'}
+          </p>
         </div>
         {pending.length > 0 && (
           <StatusBadge label={`${pending.length} pending`} tone="warning" pulse />
@@ -90,14 +84,14 @@ export default function ShowingInbox() {
                   <div className="flex gap-1 shrink-0">
                     <button
                       type="button"
-                      onClick={() => confirm(s.id, s.address)}
+                      onClick={() => void confirm(s.id, s.address)}
                       className="px-2.5 py-1.5 text-[11px] rounded-lg bg-emerald-600 text-white hover:bg-emerald-500"
                     >
                       Confirm
                     </button>
                     <button
                       type="button"
-                      onClick={() => decline(s.id, s.address)}
+                      onClick={() => void decline(s.id, s.address)}
                       className="px-2.5 py-1.5 text-[11px] rounded-lg border border-zinc-200 text-zinc-600 hover:bg-white"
                     >
                       Decline

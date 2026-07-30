@@ -8,7 +8,8 @@ import {
   type NurtureEnrollment,
   renderTemplate,
 } from '@/lib/nurture/sequences';
-import { loadContacts, type CrmContact } from '@/lib/crm/store';
+import { type CrmContact } from '@/lib/crm/store';
+import { loadContactsAsync } from '@/lib/crm/supabase-store';
 import { nurtureBrandContext } from '@/lib/nurture/brand';
 import { queueNurtureSms } from '@/lib/nurture/sms';
 
@@ -21,7 +22,7 @@ export default function NurturePanel() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    setContacts(loadContacts());
+    void loadContactsAsync().then(({ contacts: list }) => setContacts(list));
     setEnrollments(loadEnrollments());
   }, []);
 
@@ -136,7 +137,7 @@ export default function NurturePanel() {
 
       <button
         type="button"
-        onClick={onEnroll}
+        onClick={() => void onEnroll()}
         disabled={!selectedContact || !selectedSeq}
         className="w-full py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40"
       >

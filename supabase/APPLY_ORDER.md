@@ -8,7 +8,8 @@ Run in the **Supabase SQL Editor** for the **production** project (and preview D
 | 2 | `schema-updates.sql` | Follow-on columns / tables |
 | 3 | `schema-land-deals.sql` | Land digest cron |
 | 4 | `migrations/2026-07-17-add-visibility.sql` | Navica IDX/BBO gating — **must before live upserts** |
-| 5 | `seed-archibald-bagley.sql` | First brokerage seed |
+| 5 | `schema-crm.sql` | **Sprint 2** — CRM contacts, showings, nurture enrollments |
+| 6 | `seed-archibald-bagley.sql` | First brokerage seed |
 
 ### After apply
 
@@ -19,6 +20,12 @@ from information_schema.columns
 where table_name = 'listings' and column_name = 'visibility';
 
 select id, name, slug from brokerages;
+
+select table_name from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('crm_contacts', 'showing_requests', 'nurture_enrollments');
 ```
 
 If `visibility` is missing, hourly cron and import will fail with Postgres `42703`.
+
+If `crm_contacts` is missing, CRM stays on localStorage only (UI shows “This device”).
