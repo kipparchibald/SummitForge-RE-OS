@@ -1,5 +1,6 @@
 import './globals.css'
 import Link from 'next/link'
+import { Inter } from 'next/font/google'
 import { isDemoMode, validateEnv } from '@/lib/env'
 import {
   deploymentBranding,
@@ -11,10 +12,26 @@ import GlobalToasts from '@/components/GlobalToasts'
 import { BrandPhone, BrandText } from '@/components/BrandText'
 import { PRODUCT_BRAND, PRODUCT_DESCRIPTION, PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/product'
 
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
 export const metadata = {
   title: `${PRODUCT_BRAND} · RE OS`,
   description: PRODUCT_DESCRIPTION,
   icons: { icon: '/favicon.ico' },
+  robots: {
+    index: true,
+    follow: true,
+  },
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#1e3a5f',
 }
 
 export default function RootLayout({
@@ -31,8 +48,8 @@ export default function RootLayout({
   const phoneFallback = brand.phone || '(208) 745-5911';
 
   return (
-    <html lang="en" data-demo={isDemo ? 'on' : 'off'} suppressHydrationWarning>
-      <body className="bg-gray-50 min-h-screen" suppressHydrationWarning>
+    <html lang="en" data-demo={isDemo ? 'on' : 'off'} className={inter.variable} suppressHydrationWarning>
+      <body className={`${inter.className} bg-gray-50 min-h-screen`} suppressHydrationWarning>
         {brandCss ? (
           <style
             id="sf-deployment-brand"
@@ -118,22 +135,37 @@ export default function RootLayout({
         />
 
         {isDemo && (
-          <div className="demo-banner flex items-center justify-center gap-2 font-medium">
-            🚀 <strong>DEMO MODE</strong> — Full access enabled for preview. No limits. Ready for real keys &amp; production.
-            <a href="/settings/branding" className="underline ml-2">Customize branding</a>
-            <span className="mx-1">•</span>
-            <a href="/ai-assistants" className="underline">Talk to AI Assistants</a>
+          <div className="demo-banner flex flex-wrap items-center justify-center gap-x-2 gap-y-1 font-medium">
+            <span>
+              <strong>DEMO MODE</strong> — Full access for preview. No limits.
+            </span>
+            <a href="/settings/branding" className="underline underline-offset-2">
+              Branding
+            </a>
+            <span className="text-amber-700/50" aria-hidden>
+              ·
+            </span>
+            <a href="/ai-assistants" className="underline underline-offset-2">
+              AI Assistants
+            </a>
+            <span className="text-amber-700/50" aria-hidden>
+              ·
+            </span>
+            <a href="/setup" className="underline underline-offset-2">
+              Setup
+            </a>
           </div>
         )}
 
         {isDemo && envStatus.warnings.length > 0 && (
-          <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-4 py-1 text-center">
-            Env notes: {envStatus.warnings.slice(0, 2).join(' • ')}{envStatus.warnings.length > 2 ? ' …' : ''} (see console or /setup)
+          <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-4 py-1.5 text-center">
+            Env notes: {envStatus.warnings.slice(0, 2).join(' · ')}
+            {envStatus.warnings.length > 2 ? ' …' : ''} (see /setup)
           </div>
         )}
 
         <div className="flex min-h-screen">
-          <aside className="w-[272px] bg-slate-50 border-r border-slate-200/80 hidden lg:flex flex-col sticky top-0 h-screen">
+          <aside className="w-[272px] bg-slate-50/95 border-r border-slate-200/80 hidden lg:flex flex-col sticky top-0 h-screen backdrop-blur-sm">
             <div className="px-5 pt-6 pb-4 border-b border-slate-200/80">
               <Link
                 href="/"
@@ -157,10 +189,10 @@ export default function RootLayout({
                 <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">
                   Workspace
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold ring-1 ring-emerald-100 group-hover:ring-emerald-300">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold ring-1 ring-emerald-100 group-hover:ring-emerald-300 transition">
                   {isDemo ? 'PRO · Demo' : 'PRO'}
                 </div>
-                <div className="mt-2 text-[10px] text-slate-400 leading-relaxed group-hover:text-slate-500">
+                <div className="mt-2 text-[10px] text-slate-400 leading-relaxed group-hover:text-slate-500 transition">
                   Full MLS · Land · GIS · AI · White-label
                 </div>
               </Link>
@@ -207,13 +239,13 @@ export default function RootLayout({
                 </span>
                 <Link
                   href="/import"
-                  className="hidden sm:inline-flex px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-slate-50 font-medium"
+                  className="hidden sm:inline-flex px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-slate-50 font-medium transition"
                 >
                   MLS Import
                 </Link>
                 <Link
                   href="/ai-assistants"
-                  className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
+                  className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition"
                 >
                   AI
                 </Link>
@@ -221,7 +253,7 @@ export default function RootLayout({
                   <form action="/auth/signout" method="post">
                     <button
                       type="submit"
-                      className="px-2.5 py-1.5 text-xs rounded-lg border text-slate-500 hover:bg-slate-50"
+                      className="px-2.5 py-1.5 text-xs rounded-lg border text-slate-500 hover:bg-slate-50 transition"
                     >
                       Sign out
                     </button>

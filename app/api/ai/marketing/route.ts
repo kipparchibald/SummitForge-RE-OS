@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { marketingAgent } from '@/lib/marketing/agent';
 import type { CampaignBrief } from '@/lib/marketing/types';
+import { rateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
+import {
+  clampString,
+  guardErrorResponse,
+  readJsonBody,
+  RequestGuardError,
+} from '@/lib/security/request';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,12 +20,16 @@ export const dynamic = 'force-dynamic';
  * C) { action: 'rebuild', campaign, notes } → revision loop
  */
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(request, { limit: 20, windowMs: 60_000, key: 'ai-mkt' });
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
-    const body = await request.json();
+    const body = await readJsonBody<any>(request, 256 * 1024);
 
     // Rebuild with revision notes
     if (body.action === 'rebuild' && body.campaign && body.notes) {
-      const result = await marketingAgent.rebuildWithNotes(body.campaign, body.notes);
+      const notes = clampString(body.notes, 4000);
+      const result = await marketingAgent.rebuildWithNotes(body.campaign, notes);
       return NextResponse.json({
         ...result,
         message: 'Campaign rebuilt with your notes. Review and approve to deploy.',
@@ -29,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (body.brief) {
       const brief = body.brief as CampaignBrief;
       if (!brief.property?.address) {
-        return NextResponse.json({ error: 'brief.property.address is required' }, { status: 400 });
+        throw new RequestGuardError('brief.property.address is required');
       }
       const result = await marketingAgent.buildCampaign(brief);
       return NextResponse.json({
@@ -44,15 +55,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(plan);
     }
 
-    return NextResponse.json(
-      { error: 'Provide { brief } or { property } or { action: "rebuild", campaign, notes }' },
-      { status: 400 }
+    throw new RequestGuardError(
+      'Provide { brief } or { property } or { action: "rebuild", campaign, notes }'
     );
   } catch (error: any) {
+    if (error instanceof RequestGuardError) return guardErrorResponse(error);
     console.error('[api/ai/marketing]', error);
-    return NextResponse.json(
-      { error: 'Marketing agent error', message: error?.message || 'failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Marketing agent error' }, { status: 500 });
   }
 }

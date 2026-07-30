@@ -8,13 +8,21 @@
 
 **Last updated:** July 30, 2026
 
+
 **Production:** [summit-forge-re-os-voxli.vercel.app](https://summit-forge-re-os-voxli.vercel.app) · Vercel `voxli/summit-forge-re-os` · brand **Voxli.dev**  
 **Ops status:** Production ready (confirmed by owner). See `docs/DEPLOYMENT.md`.
 
 
 ---
 
-## Current Score: **9.1 / 10** product · **Production ready** (ops)
+## Current Score: **9.3 / 10** product · **Production ready** (ops)
+
+### Done recently (through July 30 — polish / security pass)
+- **Next.js 15.5.22** — App Router Server Actions DoS patch
+- **Security headers** — CSP, XFO DENY, nosniff, COOP/CORP, Permissions-Policy
+- **API hardening** — rate limits (AI, SMS, import, realtime), JSON body size caps, E.164 SMS validation, SSRF checks on import URLs
+- **UI polish** — Inter font, focus-visible, reduced-motion, brand default tokens, tighter chrome
+- **Perf** — `optimizePackageImports` for Mapbox, static cache headers, `poweredByHeader: false`
 
 ### Done recently (through July 27)
 - **Jefferson owner-of-record** — Node TLS incomplete-chain fix for `gisportal.co.jefferson.id.us`

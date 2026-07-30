@@ -1,13 +1,13 @@
 {
   "name": "summitforge-re-os",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 8080",
     "validate:env": "node scripts/validate-env.js",
     "prod:checklist": "node scripts/prod-checklist.mjs",
     "build": "npm run validate:env && next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0 -p 8080",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:smoke",
@@ -17,7 +17,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.45.0",
     "mapbox-gl": "^3.0.0",
-    "next": "15.5.20",
+    "next": "15.5.22",
     "openai": "^6.45.0",
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
@@ -25,7 +25,8 @@
     "react-map-gl": "^7.1.0"
   },
   "overrides": {
-    "postcss": "^8.5.16"
+    "postcss": "^8.5.16",
+    "brace-expansion": "^2.0.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
@@ -34,7 +35,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "eslint": "^8",
-    "eslint-config-next": "15.5.20",
+    "eslint-config-next": "15.5.22",
     "postcss": "^8.5.16",
     "tailwindcss": "^4.3.2",
     "typescript": "^5"

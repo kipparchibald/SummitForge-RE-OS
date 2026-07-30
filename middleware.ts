@@ -9,9 +9,11 @@
 //
 // Excluded from protection: /login, /auth/* (the flows that create a session),
 // /api/cron/* (bearer-token auth via lib/auth/cron.ts), and static assets.
+// Security headers applied on every matched response.
 
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { applySecurityHeaders } from '@/lib/security/headers';
 
 function isDemoMode(): boolean {
   return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
@@ -31,27 +33,38 @@ function isSupabaseConfigured(): boolean {
 
 const PUBLIC_PATHS = ['/login', '/auth'];
 
-export async function middleware(request: NextRequest) {
-  if (isDemoMode()) {
-    return NextResponse.next();
-  }
+// Public routes reachable without a session even in prod.
+// Health is intentionally public for uptime probes (no secrets in payload).
+const PUBLIC_EXACT = new Set(['/pricing', '/api/health']);
 
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Demo: open app, still stamp security headers.
+  if (isDemoMode()) {
+    return applySecurityHeaders(NextResponse.next());
+  }
+
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
+  }
+
+  if (PUBLIC_EXACT.has(pathname)) {
+    return applySecurityHeaders(NextResponse.next());
   }
 
   // Cron endpoints authenticate with their own bearer secret.
   if (pathname.startsWith('/api/cron/')) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   if (!isSupabaseConfigured()) {
-    return new NextResponse(
-      'Authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
-        '(or NEXT_PUBLIC_DEMO_MODE=true for previews).',
-      { status: 503 }
+    return applySecurityHeaders(
+      new NextResponse(
+        'Authentication is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
+          '(or NEXT_PUBLIC_DEMO_MODE=true for previews).',
+        { status: 503 }
+      )
     );
   }
 
@@ -82,15 +95,17 @@ export async function middleware(request: NextRequest) {
 
   if (!user) {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return applySecurityHeaders(
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      );
     }
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl);
+    return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
-  return response;
+  return applySecurityHeaders(response);
 }
 
 export const config = {

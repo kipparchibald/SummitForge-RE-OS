@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase, isSupabaseLive } from '@/lib/supabase/client';
+import { rateLimit, rateLimitResponse } from '@/lib/security/rateLimit';
+import {
+  assertChannelName,
+  clampString,
+  guardErrorResponse,
+  readJsonBody,
+  RequestGuardError,
+} from '@/lib/security/request';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,14 +19,24 @@ export const dynamic = 'force-dynamic';
  * the event over WebSocket. Used by import/cron/rematch routes.
  */
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(request, { limit: 60, windowMs: 60_000, key: 'rt-pub' });
+  if (!rl.ok) return rateLimitResponse(rl);
+
   try {
-    const body = await request.json();
-    const channel = body.channel as string;
-    const type = body.type || 'NOTIFY';
+    const body = await readJsonBody<{
+      channel?: string;
+      type?: string;
+      payload?: unknown;
+    }>(request, 64 * 1024);
+
+    const channel = assertChannelName(body.channel);
+    const type = clampString(body.type || 'NOTIFY', 64) || 'NOTIFY';
     const payload = body.payload ?? {};
 
-    if (!channel) {
-      return NextResponse.json({ error: 'channel required' }, { status: 400 });
+    // Bound payload size after parse
+    const payloadJson = JSON.stringify(payload);
+    if (payloadJson.length > 48 * 1024) {
+      throw new RequestGuardError('payload too large', 413);
     }
 
     if (!isSupabaseLive()) {
@@ -51,8 +69,9 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, simulated: false, channel, type });
-  } catch (e: any) {
+  } catch (e) {
+    if (e instanceof RequestGuardError) return guardErrorResponse(e);
     console.error('[realtime/publish]', e);
-    return NextResponse.json({ error: e?.message || 'publish failed' }, { status: 500 });
+    return NextResponse.json({ error: 'publish failed' }, { status: 500 });
   }
 }
