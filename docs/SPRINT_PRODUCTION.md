@@ -20,9 +20,9 @@ See **[SPRINT_0_RUNBOOK.md](./SPRINT_0_RUNBOOK.md)**.
 
 | ID | Work | Status |
 |----|------|--------|
-| S0.1 | Apply Supabase schema + visibility migration | ⬜ Ops |
-| S0.2 | Vercel prod env + `DEMO_MODE=false` | ⬜ Ops |
-| S0.3 | Seed brokerage + admin/agent users | ⬜ Ops |
+| S0.1 | Apply Supabase schema + visibility migration | ✅ Owner: prod ready |
+| S0.2 | Vercel prod env + `DEMO_MODE=false` | ✅ Owner: prod ready |
+| S0.3 | Seed brokerage + admin/agent users | ✅ Owner: prod ready |
 | S0.4 | Brand/SEO defaults (voxli.dev, AB branding env) | ✅ Code |
 | S0.5 | CI build + typecheck | ✅ Exists |
 | S0.6 | Health readiness score + prod checklist script | ✅ Code |
