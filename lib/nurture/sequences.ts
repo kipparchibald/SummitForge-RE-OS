@@ -2,6 +2,7 @@
  * Automated nurture sequences — MoxiWorks / Compass style drips.
  * SMS-first (phone primary), email secondary when captured.
  * Sequences are pure data + generators; delivery hooks into notifications.
+ * Enrollments dual-store via lib/crm/supabase-store (saveEnrollmentsAsync).
  */
 
 export type NurtureChannel = 'sms' | 'email' | 'in-app';
@@ -173,7 +174,11 @@ export function nextDueStep(
   enrollment: NurtureEnrollment,
   sequence: NurtureSequence,
   now = new Date()
-): { step: NurtureStep; index: number; rendered: (ctx: ContactContext) => { subject?: string; body: string } } | null {
+): {
+  step: NurtureStep;
+  index: number;
+  rendered: (ctx: ContactContext) => { subject?: string; body: string };
+} | null {
   if (enrollment.status !== 'active') return null;
   const idx = enrollment.nextStepIndex;
   if (idx >= sequence.steps.length) return null;
@@ -212,6 +217,9 @@ export function saveEnrollments(list: NurtureEnrollment[]) {
   localStorage.setItem(ENROLL_KEY, JSON.stringify(list));
 }
 
+/**
+ * Local enroll + best-effort cloud upsert (dynamic import avoids cycles).
+ */
 export function enrollContact(
   contactId: string,
   sequenceId: string
@@ -225,9 +233,20 @@ export function enrollContact(
     status: 'active',
   };
   const all = loadEnrollments().filter(
-    (e) => !(e.contactId === contactId && e.sequenceId === sequenceId && e.status === 'active')
+    (e) =>
+      !(e.contactId === contactId && e.sequenceId === sequenceId && e.status === 'active')
   );
   all.push(enrollment);
   saveEnrollments(all);
+
+  // Fire-and-forget cloud sync when available
+  if (typeof window !== 'undefined') {
+    void import('@/lib/crm/supabase-store')
+      .then((m) => m.upsertEnrollmentAsync(enrollment))
+      .catch(() => {
+        /* local only */
+      });
+  }
+
   return enrollment;
 }

@@ -1,19 +1,60 @@
 import { NextResponse } from 'next/server';
-import { verifyListingsSchema, isSupabaseLive } from '@/lib/supabase/client';
+import { verifyListingsSchema, isSupabaseLive, getSupabaseAdmin } from '@/lib/supabase/client';
 import { isDemoMode, validateEnv } from '@/lib/env';
 import { aiStatus } from '@/lib/ai/client';
 
 export const dynamic = 'force-dynamic';
 
+async function verifyCrmSchema(): Promise<{
+  ok: boolean;
+  tables: Record<string, boolean>;
+  message: string;
+}> {
+  if (!isSupabaseLive()) {
+    return {
+      ok: true,
+      tables: {},
+      message: 'Supabase not configured — CRM schema check skipped',
+    };
+  }
+
+  const client = getSupabaseAdmin();
+  const needed = ['crm_contacts', 'showing_requests', 'nurture_enrollments', 'alerts'] as const;
+  const tables: Record<string, boolean> = {};
+
+  for (const t of needed) {
+    try {
+      const { error } = await client.from(t).select('id').limit(1);
+      // missing table → 42P01 / relation does not exist
+      const missing =
+        !!error &&
+        (/relation|does not exist|42P01|schema cache/i.test(error.message || '') ||
+          (error as { code?: string }).code === '42P01');
+      tables[t] = !missing;
+    } catch {
+      tables[t] = false;
+    }
+  }
+
+  const missingList = needed.filter((t) => !tables[t]);
+  return {
+    ok: missingList.length === 0,
+    tables,
+    message:
+      missingList.length === 0
+        ? 'CRM / alerts tables present'
+        : `Missing tables: ${missingList.join(', ')}. Apply schema-crm.sql + Sprint 2 migration.`,
+  };
+}
+
 /**
  * Lightweight health / readiness endpoint for Voxli.dev RE OS.
  * GET /api/health
- *
- * Sprint 0: use this after deploy to confirm production mode + schema.
  */
 export async function GET() {
   const env = validateEnv();
   const schema = await verifyListingsSchema();
+  const crm = await verifyCrmSchema();
 
   const navicaConfigured = !!(process.env.NAVICA_IDX_URL && process.env.NAVICA_API_KEY);
   const cronSecretSet = !!process.env.CRON_SECRET;
@@ -32,13 +73,16 @@ export async function GET() {
   );
 
   // Schema failure is a hard fail. Missing Navica is not (Sprint 1).
-  const hardOk = schema.ok && (isDemo || (supabaseLive && env.errors.length === 0));
+  // CRM tables are soft in demo; required readiness signal in prod.
+  const hardOk =
+    schema.ok && (isDemo || (supabaseLive && env.errors.length === 0 && crm.ok));
 
   const gates = {
     demoOff: !isDemo,
     supabaseConfigured: supabaseLive,
     schemaOk: schema.ok,
     visibilityColumn: schema.hasVisibility,
+    crmSchemaOk: crm.ok,
     mapbox: !!(
       process.env.NEXT_PUBLIC_MAPBOX_TOKEN &&
       !process.env.NEXT_PUBLIC_MAPBOX_TOKEN.includes('your')
@@ -51,7 +95,7 @@ export async function GET() {
   };
 
   const grade =
-    env.readinessScore >= 85
+    env.readinessScore >= 85 && crm.ok
       ? 'production'
       : env.readinessScore >= 55
         ? 'sprint0-partial'
@@ -70,12 +114,17 @@ export async function GET() {
       gates,
       blockingErrors: env.errors,
       nextDocs: isDemo
-        ? ['docs/SPRINT_0_RUNBOOK.md']
+        ? ['docs/SPRINT_0_RUNBOOK.md', 'docs/SPRINT_PRODUCTION.md']
         : !schema.ok
           ? ['supabase/APPLY_ORDER.md', 'supabase/migrations/2026-07-17-add-visibility.sql']
-          : !navicaConfigured
-            ? ['docs/NAVICA-GO-LIVE.md']
-            : ['docs/SPRINT_PRODUCTION.md'],
+          : !crm.ok
+            ? [
+                'supabase/schema-crm.sql',
+                'supabase/migrations/2026-07-30-sprint2-tenant-rls.sql',
+              ]
+            : !navicaConfigured
+              ? ['docs/NAVICA-GO-LIVE.md']
+              : ['docs/SPRINT_PRODUCTION.md'],
     },
     ai: {
       live: ai.live,
@@ -92,6 +141,7 @@ export async function GET() {
       schemaOk: schema.ok,
       hasVisibilityColumn: schema.hasVisibility,
       message: schema.message,
+      crm,
     },
     navica: {
       configured: navicaConfigured,

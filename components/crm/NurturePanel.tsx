@@ -9,7 +9,7 @@ import {
   renderTemplate,
 } from '@/lib/nurture/sequences';
 import { type CrmContact } from '@/lib/crm/store';
-import { loadContactsAsync } from '@/lib/crm/supabase-store';
+import { loadContactsAsync, loadEnrollmentsAsync } from '@/lib/crm/supabase-store';
 import { nurtureBrandContext } from '@/lib/nurture/brand';
 import { queueNurtureSms } from '@/lib/nurture/sms';
 
@@ -20,10 +20,14 @@ export default function NurturePanel() {
   const [selectedContact, setSelectedContact] = useState('');
   const [selectedSeq, setSelectedSeq] = useState(NURTURE_SEQUENCES[0]?.id || '');
   const [toast, setToast] = useState('');
+  const [mode, setMode] = useState<'cloud' | 'local'>('local');
 
   useEffect(() => {
     void loadContactsAsync().then(({ contacts: list }) => setContacts(list));
-    setEnrollments(loadEnrollments());
+    void loadEnrollmentsAsync().then(({ enrollments: list, mode: m }) => {
+      setEnrollments(list);
+      setMode(m);
+    });
   }, []);
 
   const seq = NURTURE_SEQUENCES.find((s) => s.id === selectedSeq);
@@ -33,7 +37,9 @@ export default function NurturePanel() {
   const onEnroll = async () => {
     if (!selectedContact || !selectedSeq || !seq) return;
     enrollContact(selectedContact, selectedSeq);
-    setEnrollments(loadEnrollments());
+    const { enrollments: list, mode: m } = await loadEnrollmentsAsync();
+    setEnrollments(list.length ? list : loadEnrollments());
+    setMode(m);
 
     const step0 = seq.steps[0];
     if (step0?.channel === 'sms' && contact?.phone) {
@@ -77,93 +83,87 @@ export default function NurturePanel() {
 
   return (
     <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm space-y-4">
-      <div>
-        <h3 className="font-semibold text-zinc-900">Automated nurture</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">SMS-first drips · {brand.brokerage}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-zinc-900">Nurture sequences</div>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            SMS-first drips · {mode === 'cloud' ? 'cloud synced' : 'this device'}
+          </p>
+        </div>
       </div>
 
-      <label className="block text-xs text-zinc-500">
-        Contact
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <select
-          className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+          className="border rounded-xl px-3 py-2 text-sm"
           value={selectedContact}
           onChange={(e) => setSelectedContact(e.target.value)}
         >
           <option value="">Select contact…</option>
           {contacts.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name} · {c.stage}
+              {c.name}
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="block text-xs text-zinc-500">
-        Sequence
         <select
-          className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
+          className="border rounded-xl px-3 py-2 text-sm"
           value={selectedSeq}
           onChange={(e) => setSelectedSeq(e.target.value)}
         >
           {NURTURE_SEQUENCES.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name} ({s.steps.length} steps)
+              {s.name}
             </option>
           ))}
         </select>
-      </label>
-
-      {seq && (
-        <div className="text-xs text-zinc-500 bg-zinc-50 rounded-xl p-3 border border-zinc-100">
-          <div className="font-medium text-zinc-700 mb-1">{seq.description}</div>
-          <ul className="space-y-1">
-            {seq.steps.map((st, i) => (
-              <li key={i}>
-                Day {st.dayOffset} · {st.channel.toUpperCase()}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      </div>
 
       {preview && (
-        <div className="text-sm bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-emerald-900">
-          <div className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold mb-1">
-            First message preview
-          </div>
+        <div className="text-xs bg-zinc-50 border rounded-xl p-3 text-zinc-600">
+          <div className="font-semibold text-zinc-500 mb-1">First touch preview</div>
           {preview}
         </div>
       )}
 
       <button
         type="button"
-        onClick={() => void onEnroll()}
+        onClick={onEnroll}
         disabled={!selectedContact || !selectedSeq}
-        className="w-full py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-medium hover:bg-zinc-800 disabled:opacity-40"
+        className="w-full sm:w-auto px-4 py-2 text-sm font-semibold bg-zinc-900 text-white rounded-xl disabled:opacity-50"
       >
-        Enroll in sequence
+        Enroll contact
       </button>
 
-      {enrollments.length > 0 && (
-        <div className="pt-2 border-t text-xs text-zinc-500">
-          <div className="font-medium text-zinc-700 mb-1">Active enrollments</div>
-          {enrollments
-            .filter((e) => e.status === 'active')
-            .slice(0, 5)
-            .map((e) => {
-              const c = contacts.find((x) => x.id === e.contactId);
-              const s = NURTURE_SEQUENCES.find((x) => x.id === e.sequenceId);
-              return (
-                <div key={e.id} className="flex justify-between gap-2 py-0.5">
-                  <span className="truncate">{c?.name || e.contactId}</span>
-                  <span className="shrink-0 text-zinc-400">{s?.name || e.sequenceId}</span>
-                </div>
-              );
-            })}
+      {toast && (
+        <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          {toast}
         </div>
       )}
 
-      {toast && <p className="text-xs text-emerald-600">{toast}</p>}
+      {enrollments.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold mb-2">
+            Active enrollments
+          </div>
+          <ul className="space-y-1.5 max-h-36 overflow-y-auto">
+            {enrollments
+              .filter((e) => e.status === 'active')
+              .slice(0, 12)
+              .map((e) => {
+                const c = contacts.find((x) => x.id === e.contactId);
+                const s = NURTURE_SEQUENCES.find((x) => x.id === e.sequenceId);
+                return (
+                  <li key={e.id} className="text-xs text-zinc-600 flex justify-between gap-2">
+                    <span>
+                      {c?.name || e.contactId} · {s?.name || e.sequenceId}
+                    </span>
+                    <span className="text-zinc-400">step {e.nextStepIndex + 1}</span>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

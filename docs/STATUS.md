@@ -15,21 +15,23 @@
 
 ---
 
-## Current Score: **9.3 / 10** product · **Production ready** (ops)
+## Current Score: **9.4 / 10** product · **Production ready** (ops)
 
-### Done recently (through July 30 — polish / security pass)
+### Done recently (July 30 — Sprint 2 durable CRM / alerts)
+- **Shared cookie session client** — CRM + alerts now use `getBrowserSupabase()` (`@supabase/ssr`) so login sessions actually reach dual-stores (was broken with raw `createClient`)
+- **Brokerage slug resolution** — writes stamp `brokerage_id` from `profiles` → `brokerages.slug`
+- **Tenant RLS migration** — `supabase/migrations/2026-07-30-sprint2-tenant-rls.sql` (desk isolation by brokerage; admin/broker override)
+- **Nurture enrollments** dual-store + cloud upsert on enroll
+- **CRM UI** — storage badge, delete contact, “Sync device → cloud”
+- **Alerts UI** — storage badge + cloud migrate CTA
+- **Health** — `gates.crmSchemaOk` + table presence diagnostics
+
+### Done recently (July 30 — polish / security pass)
 - **Next.js 15.5.22** — App Router Server Actions DoS patch
 - **Security headers** — CSP, XFO DENY, nosniff, COOP/CORP, Permissions-Policy
 - **API hardening** — rate limits (AI, SMS, import, realtime), JSON body size caps, E.164 SMS validation, SSRF checks on import URLs
 - **UI polish** — Inter font, focus-visible, reduced-motion, brand default tokens, tighter chrome
 - **Perf** — `optimizePackageImports` for Mapbox, static cache headers, `poweredByHeader: false`
-
-### Done recently (through July 27)
-- **Jefferson owner-of-record** — Node TLS incomplete-chain fix for `gisportal.co.jefferson.id.us`
-- **Smoke suite** — 151 checks
-- **Offer engine** — win-probability scoring (`/offer`)
-- **Moxi polish** — CMA export PDF, portal showings, nurture panel, realtime + toasts
-- **AI Plat optimizer**, **GIS → CMA**, **Marketing Agent (approve → deploy)**
 
 ### Sprint 0 production foundations (July 30)
 - `docs/SPRINT_0_RUNBOOK.md` — ops checklist for Supabase + Vercel + users
@@ -39,19 +41,12 @@
 - `npm run prod:checklist`
 - robots/sitemap pointed at **voxli.dev**
 
-### Verified (July 27 loop)
-| Check | Result |
-|-------|--------|
-| `npm run typecheck` | Pass |
-| `SMOKE_BASE_URL=http://localhost:3000 npm run test:smoke` | **151 passed, 0 failed** |
-| GIS Rigby point | Owner + address from Jefferson assessor |
-
-### Next (ordered) — net-new product work
-1. **Sprint 1:** Navica IDX live credentials when SRMLS delivers (`docs/NAVICA-GO-LIVE.md`)  
-2. **Sprint 2:** CRM / alerts off localStorage → Supabase RLS  
-3. Twilio live nurture SMS  
-4. Stripe Checkout sessions  
-5. White-label tenant #2  
+### Next (ordered)
+1. **Owner:** run Sprint 2 SQL on prod Supabase (APPLY_ORDER steps 5–7)  
+2. **Sprint 1:** Navica IDX live credentials when SRMLS delivers  
+3. **S2.6** Tenant switcher UI + isolation tests  
+4. Twilio live nurture SMS  
+5. Stripe Checkout sessions  
 
 ---
 

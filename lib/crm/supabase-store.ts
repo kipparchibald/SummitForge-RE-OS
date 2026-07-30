@@ -1,12 +1,20 @@
 /**
  * CRM dual store: localStorage cache + Supabase when authenticated.
- * Matches the alerts dual-store pattern (lib/alerts/supabase-store.ts).
+ * Uses shared getBrowserSupabase() so login sessions are visible (SSR cookies).
  *
- * - Demo / signed-out: localStorage only (existing behavior)
- * - Supabase + session: load/save crm_contacts for multi-device pipeline
+ * - Demo / signed-out: localStorage only
+ * - Supabase + session: crm_contacts for multi-device pipeline
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+'use client';
+
+import {
+  DEFAULT_BROKERAGE_SLUG,
+  getBrowserBrokerageSlug,
+  getBrowserSupabase,
+  getBrowserUserId,
+  isBrowserSupabaseConfigured,
+} from '@/lib/auth/browser';
 import {
   DEMO_CONTACTS,
   loadContacts as localLoad,
@@ -19,47 +27,17 @@ import {
   loadShowingRequests as localLoadShowings,
   saveShowingRequestsLocal,
 } from '@/lib/portal/matches';
-
-const DEFAULT_BROKERAGE = 'archibald-bagley';
-
-let _client: SupabaseClient | null | undefined;
-
-function getClient(): SupabaseClient | null {
-  if (_client !== undefined) return _client;
-  if (typeof window === 'undefined') {
-    _client = null;
-    return null;
-  }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (
-    !url ||
-    !key ||
-    url.includes('your-project') ||
-    url.includes('demo.supabase.co') ||
-    key.includes('your-anon')
-  ) {
-    _client = null;
-    return null;
-  }
-  _client = createClient(url, key);
-  return _client;
-}
+import {
+  loadEnrollments as localLoadEnrollments,
+  saveEnrollments as localSaveEnrollments,
+  type NurtureEnrollment,
+} from '@/lib/nurture/sequences';
 
 export function isCrmCloudConfigured(): boolean {
-  return !!getClient();
+  return isBrowserSupabaseConfigured();
 }
 
 export type CrmStorageMode = 'cloud' | 'local';
-
-async function sessionUserId(sb: SupabaseClient): Promise<string | null> {
-  try {
-    const { data } = await sb.auth.getUser();
-    return data.user?.id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function rowToContact(row: Record<string, unknown>): CrmContact {
   return {
@@ -79,7 +57,7 @@ function rowToContact(row: Record<string, unknown>): CrmContact {
   };
 }
 
-function contactToRow(c: CrmContact, userId: string, brokerageId = DEFAULT_BROKERAGE) {
+function contactToRow(c: CrmContact, userId: string, brokerageId: string) {
   return {
     id: c.id,
     user_id: userId,
@@ -107,9 +85,9 @@ export async function loadContactsAsync(): Promise<{
   contacts: CrmContact[];
   mode: CrmStorageMode;
 }> {
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (sb) {
-    const userId = await sessionUserId(sb);
+    const userId = await getBrowserUserId();
     if (userId) {
       try {
         const { data, error } = await sb
@@ -125,8 +103,9 @@ export async function loadContactsAsync(): Promise<{
           const local = localLoad();
           const seed = local.length ? local : DEMO_CONTACTS;
           if (seed.length) {
+            const brokerageId = await getBrowserBrokerageSlug();
             await sb.from('crm_contacts').upsert(
-              seed.map((c) => contactToRow(c, userId)),
+              seed.map((c) => contactToRow(c, userId, brokerageId)),
               { onConflict: 'id' }
             );
             localSave(seed);
@@ -152,16 +131,20 @@ export async function saveContactsAsync(list: CrmContact[]): Promise<{
   error?: string;
 }> {
   localSave(list);
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (!sb) return { mode: 'local' };
 
-  const userId = await sessionUserId(sb);
+  const userId = await getBrowserUserId();
   if (!userId) return { mode: 'local' };
 
   try {
+    const brokerageId = await getBrowserBrokerageSlug();
     const { error } = await sb
       .from('crm_contacts')
-      .upsert(list.map((c) => contactToRow(c, userId)), { onConflict: 'id' });
+      .upsert(
+        list.map((c) => contactToRow(c, userId, brokerageId)),
+        { onConflict: 'id' }
+      );
     if (error) {
       console.warn('[crm] cloud save failed:', error.message);
       return { mode: 'local', error: error.message };
@@ -181,15 +164,16 @@ export async function upsertContactAsync(contact: CrmContact): Promise<CrmStorag
   else local.unshift(contact);
   localSave(local);
 
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (!sb) return 'local';
-  const userId = await sessionUserId(sb);
+  const userId = await getBrowserUserId();
   if (!userId) return 'local';
 
   try {
+    const brokerageId = await getBrowserBrokerageSlug();
     const { error } = await sb
       .from('crm_contacts')
-      .upsert(contactToRow(contact, userId), { onConflict: 'id' });
+      .upsert(contactToRow(contact, userId, brokerageId), { onConflict: 'id' });
     if (error) {
       console.warn('[crm] upsert failed:', error.message);
       return 'local';
@@ -198,6 +182,51 @@ export async function upsertContactAsync(contact: CrmContact): Promise<CrmStorag
   } catch {
     return 'local';
   }
+}
+
+/** Delete contact from local + cloud. */
+export async function deleteContactAsync(id: string): Promise<CrmStorageMode> {
+  const next = localLoad().filter((c) => c.id !== id);
+  localSave(next);
+
+  const sb = getBrowserSupabase();
+  if (!sb) return 'local';
+  const userId = await getBrowserUserId();
+  if (!userId) return 'local';
+
+  try {
+    const { error } = await sb.from('crm_contacts').delete().eq('id', id);
+    if (error) {
+      console.warn('[crm] delete failed:', error.message);
+      return 'local';
+    }
+    return 'cloud';
+  } catch {
+    return 'local';
+  }
+}
+
+/**
+ * Force-push local CRM (and optional enrollments) to cloud when signed in.
+ * Used by "Sync this device → cloud" on the CRM page.
+ */
+export async function migrateLocalCrmToCloud(): Promise<{
+  mode: CrmStorageMode;
+  contacts: number;
+  error?: string;
+}> {
+  const list = localLoad();
+  const result = await saveContactsAsync(list.length ? list : DEMO_CONTACTS);
+  if (result.error) return { mode: 'local', contacts: list.length, error: result.error };
+
+  // Also push nurture enrollments if table exists
+  try {
+    await saveEnrollmentsAsync(localLoadEnrollments());
+  } catch {
+    /* optional */
+  }
+
+  return { mode: result.mode, contacts: list.length || DEMO_CONTACTS.length };
 }
 
 function rowToShowing(row: Record<string, unknown>): ShowingRequest {
@@ -212,11 +241,11 @@ function rowToShowing(row: Record<string, unknown>): ShowingRequest {
   };
 }
 
-function showingToRow(s: ShowingRequest, userId: string | null) {
+function showingToRow(s: ShowingRequest, userId: string | null, brokerageId: string) {
   return {
     id: s.id,
     user_id: userId,
-    brokerage_id: DEFAULT_BROKERAGE,
+    brokerage_id: brokerageId,
     match_id: s.matchId,
     address: s.address,
     preferred_times: s.preferredTimes ?? null,
@@ -231,9 +260,9 @@ export async function loadShowingsAsync(): Promise<{
   showings: ShowingRequest[];
   mode: CrmStorageMode;
 }> {
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (sb) {
-    const userId = await sessionUserId(sb);
+    const userId = await getBrowserUserId();
     if (userId) {
       try {
         const { data, error } = await sb
@@ -261,13 +290,14 @@ export async function persistShowingAsync(req: ShowingRequest): Promise<CrmStora
   else all.unshift(req);
   saveShowingRequestsLocal(all);
 
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (!sb) return 'local';
-  const userId = await sessionUserId(sb);
+  const userId = await getBrowserUserId();
   try {
+    const brokerageId = await getBrowserBrokerageSlug();
     const { error } = await sb
       .from('showing_requests')
-      .upsert(showingToRow(req, userId), { onConflict: 'id' });
+      .upsert(showingToRow(req, userId, brokerageId), { onConflict: 'id' });
     if (error) {
       console.warn('[crm] showing upsert:', error.message);
       return 'local';
@@ -285,7 +315,7 @@ export async function updateShowingStatusAsync(
   const all = localLoadShowings().map((s) => (s.id === id ? { ...s, status } : s));
   saveShowingRequestsLocal(all);
 
-  const sb = getClient();
+  const sb = getBrowserSupabase();
   if (sb) {
     try {
       await sb
@@ -298,3 +328,97 @@ export async function updateShowingStatusAsync(
   }
   return all;
 }
+
+// ---------------------------------------------------------------------------
+// Nurture enrollments (cloud dual-store)
+// ---------------------------------------------------------------------------
+
+function enrollmentToRow(e: NurtureEnrollment, userId: string | null, brokerageId: string) {
+  return {
+    id: e.id,
+    user_id: userId,
+    brokerage_id: brokerageId,
+    contact_id: e.contactId,
+    sequence_id: e.sequenceId,
+    enrolled_at: e.enrolledAt,
+    next_step_index: e.nextStepIndex,
+    status: e.status,
+    last_sent_at: e.lastSentAt ?? null,
+  };
+}
+
+function rowToEnrollment(row: Record<string, unknown>): NurtureEnrollment {
+  return {
+    id: String(row.id),
+    contactId: String(row.contact_id),
+    sequenceId: String(row.sequence_id),
+    enrolledAt: String(row.enrolled_at || new Date().toISOString()),
+    nextStepIndex: Number(row.next_step_index || 0),
+    status: (row.status as NurtureEnrollment['status']) || 'active',
+    lastSentAt: row.last_sent_at ? String(row.last_sent_at) : undefined,
+  };
+}
+
+export async function loadEnrollmentsAsync(): Promise<{
+  enrollments: NurtureEnrollment[];
+  mode: CrmStorageMode;
+}> {
+  const sb = getBrowserSupabase();
+  if (sb) {
+    const userId = await getBrowserUserId();
+    if (userId) {
+      try {
+        const { data, error } = await sb
+          .from('nurture_enrollments')
+          .select('*')
+          .order('enrolled_at', { ascending: false })
+          .limit(200);
+        if (!error && data && data.length > 0) {
+          const enrollments = data.map(rowToEnrollment);
+          localSaveEnrollments(enrollments);
+          return { enrollments, mode: 'cloud' };
+        }
+      } catch (e) {
+        console.warn('[crm] enrollments load failed', e);
+      }
+    }
+  }
+  return { enrollments: localLoadEnrollments(), mode: 'local' };
+}
+
+export async function saveEnrollmentsAsync(
+  list: NurtureEnrollment[]
+): Promise<CrmStorageMode> {
+  localSaveEnrollments(list);
+  const sb = getBrowserSupabase();
+  if (!sb) return 'local';
+  const userId = await getBrowserUserId();
+  if (!userId) return 'local';
+
+  try {
+    const brokerageId = await getBrowserBrokerageSlug();
+    const { error } = await sb
+      .from('nurture_enrollments')
+      .upsert(
+        list.map((e) => enrollmentToRow(e, userId, brokerageId)),
+        { onConflict: 'id' }
+      );
+    if (error) {
+      console.warn('[crm] enrollments save:', error.message);
+      return 'local';
+    }
+    return 'cloud';
+  } catch {
+    return 'local';
+  }
+}
+
+export async function upsertEnrollmentAsync(
+  enrollment: NurtureEnrollment
+): Promise<CrmStorageMode> {
+  const all = localLoadEnrollments().filter((e) => e.id !== enrollment.id);
+  all.push(enrollment);
+  return saveEnrollmentsAsync(all);
+}
+
+export { DEFAULT_BROKERAGE_SLUG };

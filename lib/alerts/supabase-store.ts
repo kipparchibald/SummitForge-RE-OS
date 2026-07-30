@@ -1,8 +1,15 @@
-// Dual store: localStorage (always) + Supabase (when configured)
-// Seamless offline → cloud upgrade path for multi-tenant later.
+// Dual store: localStorage (always) + Supabase (when signed in).
+// Uses shared getBrowserSupabase() so cookie auth sessions are honored.
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+'use client';
+
 import type { Alert, AlertMatch, Listing } from '@/types/alerts';
+import {
+  getBrowserBrokerageSlug,
+  getBrowserSupabase,
+  getBrowserUserId,
+  isBrowserSupabaseConfigured,
+} from '@/lib/auth/browser';
 import {
   getStoredMatches as localGetMatches,
   saveMatches as localSaveMatches,
@@ -16,29 +23,27 @@ import {
 } from './store';
 import { withDemoMatchesIfEmpty } from './demo-seed';
 
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient | null {
-  if (supabase) return supabase;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key || url.includes('your-project') || url.includes('demo.supabase.co') || key.includes('your-anon')) {
-    return null;
-  }
-  supabase = createClient(url, key);
-  return supabase;
+export function isSupabaseConfigured(): boolean {
+  return isBrowserSupabaseConfigured();
 }
 
-export function isSupabaseConfigured(): boolean {
-  return !!getSupabase();
+export type AlertStorageMode = 'cloud' | 'local';
+
+export async function getStorageMode(): Promise<AlertStorageMode> {
+  const sb = getBrowserSupabase();
+  if (!sb) return 'local';
+  const uid = await getBrowserUserId();
+  return uid ? 'cloud' : 'local';
 }
 
 export async function getAlerts(userId?: string): Promise<Alert[]> {
-  const sb = getSupabase();
+  const sb = getBrowserSupabase();
   if (sb) {
     try {
+      const uid = userId || (await getBrowserUserId());
       let q = sb.from('alerts').select('*').order('created_at', { ascending: false });
-      if (userId) q = q.eq('user_id', userId);
+      // When signed in, RLS scopes by brokerage; optional agent filter kept soft.
+      if (uid && userId) q = q.eq('user_id', uid);
       const { data, error } = await q;
       if (!error && data && data.length > 0) {
         const alerts = data.map(rowToAlert);
@@ -52,26 +57,41 @@ export async function getAlerts(userId?: string): Promise<Alert[]> {
   return localGetAlerts();
 }
 
-export async function saveAlert(alert: Alert): Promise<void> {
+export async function saveAlert(alert: Alert): Promise<AlertStorageMode> {
+  const uid = (await getBrowserUserId()) || alert.userId || 'local';
+  const brokerageId = (await getBrowserBrokerageSlug()) || alert.brokerageId || 'archibald-bagley';
+  const enriched: Alert = {
+    ...alert,
+    userId: uid,
+    brokerageId,
+  };
+
   const existing = localGetAlerts();
-  const idx = existing.findIndex((a) => a.id === alert.id);
-  if (idx >= 0) existing[idx] = alert;
-  else existing.unshift(alert);
+  const idx = existing.findIndex((a) => a.id === enriched.id);
+  if (idx >= 0) existing[idx] = enriched;
+  else existing.unshift(enriched);
   localSaveAlerts(existing);
 
-  const sb = getSupabase();
-  if (sb) {
+  const sb = getBrowserSupabase();
+  if (sb && uid !== 'local') {
     try {
-      await sb.from('alerts').upsert(alertToRow(alert));
+      const { error } = await sb.from('alerts').upsert(alertToRow(enriched));
+      if (error) {
+        console.warn('[supabase-store] saveAlert failed', error.message);
+        return 'local';
+      }
+      return 'cloud';
     } catch (e) {
       console.warn('[supabase-store] saveAlert failed', e);
+      return 'local';
     }
   }
+  return 'local';
 }
 
 export async function deleteAlert(id: string): Promise<void> {
   localDeleteAlert(id);
-  const sb = getSupabase();
+  const sb = getBrowserSupabase();
   if (sb) {
     try {
       await sb.from('alerts').delete().eq('id', id);
@@ -82,16 +102,21 @@ export async function deleteAlert(id: string): Promise<void> {
 }
 
 export async function getMatches(limit = 50): Promise<AlertMatch[]> {
-  const sb = getSupabase();
+  const sb = getBrowserSupabase();
   if (sb) {
     try {
-      const { data, error } = await sb
-        .from('alert_matches')
-        .select('*')
-        .order('matched_at', { ascending: false })
-        .limit(limit);
-      if (!error && data && data.length > 0) {
-        return data.map(rowToMatch);
+      const uid = await getBrowserUserId();
+      if (uid) {
+        const { data, error } = await sb
+          .from('alert_matches')
+          .select('*')
+          .order('matched_at', { ascending: false })
+          .limit(limit);
+        if (!error && data && data.length > 0) {
+          const matches = data.map(rowToMatch);
+          localSaveMatches(matches);
+          return matches;
+        }
       }
     } catch (e) {
       console.warn('[supabase-store] getMatches failed, falling back', e);
@@ -101,22 +126,30 @@ export async function getMatches(limit = 50): Promise<AlertMatch[]> {
   return withDemoMatchesIfEmpty(local).slice(0, limit);
 }
 
-export async function addMatches(matches: AlertMatch[]): Promise<void> {
+export async function addMatches(matches: AlertMatch[]): Promise<AlertStorageMode> {
   localAddMatches(matches);
 
-  const sb = getSupabase();
-  if (sb && matches.length) {
+  const sb = getBrowserSupabase();
+  const uid = await getBrowserUserId();
+  if (sb && uid && matches.length) {
     try {
-      await sb.from('alert_matches').upsert(matches.map(matchToRow));
+      const { error } = await sb.from('alert_matches').upsert(matches.map(matchToRow));
+      if (error) {
+        console.warn('[supabase-store] addMatches failed', error.message);
+        return 'local';
+      }
+      return 'cloud';
     } catch (e) {
       console.warn('[supabase-store] addMatches failed', e);
+      return 'local';
     }
   }
+  return 'local';
 }
 
 export async function markMatchNotified(matchId: string): Promise<void> {
   localMarkNotified(matchId);
-  const sb = getSupabase();
+  const sb = getBrowserSupabase();
   if (sb) {
     try {
       await sb.from('alert_matches').update({ notified: true }).eq('id', matchId);
@@ -132,6 +165,42 @@ export async function getListings(): Promise<Listing[]> {
 
 export async function addListings(listings: Listing[]): Promise<void> {
   localAddListings(listings);
+}
+
+/** Push local alerts + matches into Supabase when signed in. */
+export async function migrateLocalAlertsToCloud(): Promise<{
+  mode: AlertStorageMode;
+  alerts: number;
+  matches: number;
+  error?: string;
+}> {
+  const sb = getBrowserSupabase();
+  const uid = await getBrowserUserId();
+  if (!sb || !uid) {
+    return { mode: 'local', alerts: 0, matches: 0, error: 'Sign in required for cloud sync' };
+  }
+
+  const alerts = localGetAlerts();
+  const matches = localGetMatches();
+  const brokerageId = await getBrowserBrokerageSlug();
+
+  try {
+    if (alerts.length) {
+      const rows = alerts.map((a) =>
+        alertToRow({ ...a, userId: uid, brokerageId: a.brokerageId || brokerageId })
+      );
+      const { error } = await sb.from('alerts').upsert(rows);
+      if (error) return { mode: 'local', alerts: 0, matches: 0, error: error.message };
+    }
+    if (matches.length) {
+      const { error } = await sb.from('alert_matches').upsert(matches.map(matchToRow));
+      if (error) return { mode: 'local', alerts: alerts.length, matches: 0, error: error.message };
+    }
+    return { mode: 'cloud', alerts: alerts.length, matches: matches.length };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { mode: 'local', alerts: 0, matches: 0, error: msg };
+  }
 }
 
 function rowToAlert(row: any): Alert {

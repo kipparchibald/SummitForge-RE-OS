@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { Alert, Location, PropertyType } from '@/types/alerts';
 import { COUNTIES } from '@/lib/geo/counties';
 import {
@@ -8,7 +9,10 @@ import {
   saveAlert,
   deleteAlert,
   getMatches,
+  getStorageMode,
   isSupabaseConfigured,
+  migrateLocalAlertsToCloud,
+  type AlertStorageMode,
 } from '@/lib/alerts/supabase-store';
 import RecentMatches from '@/components/RecentMatches';
 import { ingestAlertMatches } from '@/lib/portal/matches';
@@ -23,7 +27,9 @@ export default function PropertyAlerts() {
   const [matchCount, setMatchCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [supabaseOn, setSupabaseOn] = useState(false);
+  const [storageMode, setStorageMode] = useState<AlertStorageMode>('local');
   const [rematching, setRematching] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   type NotifyChoice = 'sms' | 'email' | 'both';
   const notifyChoiceToChannels = (c: NotifyChoice): ('email' | 'sms' | 'in-app')[] => {
@@ -31,7 +37,9 @@ export default function PropertyAlerts() {
     if (c === 'email') return ['email'];
     return ['sms'];
   };
-  const channelsToNotifyChoice = (channels: ('email' | 'sms' | 'in-app')[] | undefined): NotifyChoice => {
+  const channelsToNotifyChoice = (
+    channels: ('email' | 'sms' | 'in-app')[] | undefined
+  ): NotifyChoice => {
     const list = channels || [];
     const hasSms = list.includes('sms');
     const hasEmail = list.includes('email');
@@ -56,9 +64,10 @@ export default function PropertyAlerts() {
     setLoading(true);
     try {
       setSupabaseOn(isSupabaseConfigured());
-      const [a, m] = await Promise.all([getAlerts(), getMatches()]);
+      const [a, m, mode] = await Promise.all([getAlerts(), getMatches(), getStorageMode()]);
       setAlerts(a);
       setMatchCount(m.length);
+      setStorageMode(mode);
     } finally {
       setLoading(false);
     }
@@ -88,7 +97,7 @@ export default function PropertyAlerts() {
       alert('Name and at least one location are required');
       return;
     }
-    await saveAlert({
+    const mode = await saveAlert({
       ...(editingAlert || ({} as Alert)),
       id: editingAlert?.id || `alert_${Date.now()}`,
       name: form.name.trim(),
@@ -106,6 +115,7 @@ export default function PropertyAlerts() {
       phone: form.phone || undefined,
       createdAt: editingAlert?.createdAt || new Date().toISOString(),
     } as Alert);
+    setStorageMode(mode);
     resetForm();
     setShowForm(false);
     await refresh();
@@ -133,6 +143,22 @@ export default function PropertyAlerts() {
     await refresh();
   };
 
+  const handleSyncCloud = async () => {
+    setSyncing(true);
+    try {
+      const result = await migrateLocalAlertsToCloud();
+      setStorageMode(result.mode);
+      if (result.error) {
+        alert(result.error);
+      } else if (result.mode === 'cloud') {
+        alert(`Synced ${result.alerts} alerts and ${result.matches} matches to Supabase`);
+        await refresh();
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleRematch = async () => {
     setRematching(true);
     try {
@@ -147,14 +173,12 @@ export default function PropertyAlerts() {
         await addMatches(data.matches);
         try {
           ingestAlertMatches(data.matches);
-        } catch (err) {
-          console.warn('Portal ingest failed', err);
+        } catch {
+          /* */
         }
       }
       await refresh();
       setActiveTab('matches');
-    } catch (e) {
-      console.error(e);
     } finally {
       setRematching(false);
     }
@@ -179,198 +203,290 @@ export default function PropertyAlerts() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex justify-between items-end mb-6">
+    <div className="p-6 sm:p-10 max-w-5xl mx-auto">
+      <div className="page-header flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 mb-6 border-b">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Property Alerts</h1>
-          <p className="text-gray-600 mt-1">
-            AI matching + SMS-first notifications · matches push to client portal
-            {supabaseOn ? (
-              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                Supabase connected
-              </span>
-            ) : (
-              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                Local storage mode
-              </span>
-            )}
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold mb-2">
+            Inventory
+          </div>
+          <h1 className="text-3xl font-medium tracking-tight font-serif">Property Alerts</h1>
+          <p className="text-neutral-500 mt-2 text-sm max-w-xl">
+            SMS-first matching on every MLS import. Cloud-synced when signed in.
           </p>
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <span
+              className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+                storageMode === 'cloud'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  storageMode === 'cloud' ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+              />
+              {storageMode === 'cloud' ? 'Supabase · brokerage synced' : 'This device only'}
+              {loading ? ' · loading…' : ''}
+            </span>
+            {supabaseOn && storageMode === 'local' && (
+              <button
+                type="button"
+                onClick={handleSyncCloud}
+                disabled={syncing}
+                className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border hover:border-slate-900 disabled:opacity-50"
+              >
+                {syncing ? 'Syncing…' : 'Sync device → cloud'}
+              </button>
+            )}
+            {!supabaseOn && (
+              <Link href="/setup" className="text-[11px] text-slate-500 underline">
+                Configure Supabase
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={handleRematch}
             disabled={rematching || alerts.length === 0}
-            className="border border-gray-300 text-gray-800 px-4 py-2.5 rounded-2xl text-sm font-medium hover:bg-gray-50 transition disabled:opacity-50"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border rounded-lg hover:bg-slate-50 disabled:opacity-50"
           >
-            {rematching ? 'Re-matching…' : 'Re-run Matching'}
+            {rematching ? 'Matching…' : 'Re-match board'}
           </button>
           <button
+            type="button"
             onClick={() => {
               resetForm();
-              setShowForm(!showForm);
+              setShowForm(true);
             }}
-            className="bg-black text-white px-6 py-2.5 rounded-2xl text-sm font-medium hover:bg-gray-900 transition"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold bg-slate-900 text-white rounded-lg"
           >
-            {showForm ? 'Cancel' : '+ New Alert'}
+            New alert
           </button>
         </div>
       </div>
 
       <div className="flex gap-2 mb-6">
-        <button
+        <Tab
+          active={activeTab === 'alerts'}
           onClick={() => setActiveTab('alerts')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium ${
-            activeTab === 'alerts' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          Alerts ({alerts.length})
-        </button>
-        <button
+          label={`Alerts (${alerts.length})`}
+        />
+        <Tab
+          active={activeTab === 'matches'}
           onClick={() => setActiveTab('matches')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium ${
-            activeTab === 'matches' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          Matches ({matchCount})
-        </button>
-        <a
-          href="/portal"
-          className="px-4 py-2 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 border border-emerald-100 hover:bg-emerald-100"
-        >
-          Client portal →
-        </a>
+          label={`Matches (${matchCount})`}
+        />
       </div>
 
-      {showForm && (
-        <div className="bg-white border rounded-3xl p-6 mb-6 shadow-sm space-y-4">
-          <h2 className="font-semibold">{editingAlert ? 'Edit alert' : 'Create alert'}</h2>
-          <input
-            className="w-full border rounded-xl px-3 py-2 text-sm"
-            placeholder="Alert name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <div>
-            <div className="text-xs text-gray-500 mb-2">Locations</div>
-            <div className="space-y-3">
-              {COUNTIES.map(({ county, locations }) => (
-                <div key={county}>
-                  <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{county}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {locations.map((loc) => (
-                      <button
-                        key={loc}
-                        type="button"
-                        onClick={() => toggleLocation(loc)}
-                        className={`px-3 py-1.5 rounded-full text-xs border ${
-                          form.locations.includes(loc)
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-white text-gray-600'
-                        }`}
-                      >
-                        {loc}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <label className="text-xs text-gray-500">
-              Min $
-              <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2 text-sm" value={form.minPrice} onChange={(e) => setForm((f) => ({ ...f, minPrice: Number(e.target.value) }))} />
-            </label>
-            <label className="text-xs text-gray-500">
-              Max $
-              <input type="number" className="mt-1 w-full border rounded-xl px-3 py-2 text-sm" value={form.maxPrice} onChange={(e) => setForm((f) => ({ ...f, maxPrice: Number(e.target.value) }))} />
-            </label>
-            <label className="text-xs text-gray-500">
-              Min acres
-              <input type="number" step="0.01" className="mt-1 w-full border rounded-xl px-3 py-2 text-sm" value={form.minAcres} onChange={(e) => setForm((f) => ({ ...f, minAcres: Number(e.target.value) }))} />
-            </label>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500 mb-2">Property types</div>
-            <div className="flex flex-wrap gap-2">
-              {PROPERTY_TYPES.map((t) => (
-                <button key={t} type="button" onClick={() => toggleType(t)} className={`px-3 py-1.5 rounded-full text-xs border ${form.propertyTypes.includes(t) ? 'bg-black text-white border-black' : 'bg-white text-gray-600'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.newConstructionOnly} onChange={(e) => setForm((f) => ({ ...f, newConstructionOnly: e.target.checked }))} />
-            New construction only
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="text-xs text-gray-500">
-              Notify by
-              <select
-                className="mt-1 w-full border rounded-xl px-3 py-2 text-sm"
-                value={form.notifyBy}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, notifyBy: e.target.value as NotifyChoice }))
-                }
-              >
-                <option value="sms">SMS</option>
-                <option value="email">Email</option>
-                <option value="both">Both</option>
-              </select>
-            </label>
-            <label className="text-xs text-gray-500">
-              Phone
-              <input className="mt-1 w-full border rounded-xl px-3 py-2 text-sm" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="(208) 555-0100" />
-            </label>
-          </div>
-          <button type="button" onClick={handleSave} className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-500">
-            Save alert
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-16 text-gray-400">Loading…</div>
-      ) : activeTab === 'matches' ? (
-        <div className="space-y-4">
-          <div className="text-sm text-gray-500 mb-2">
-            Matches from Navica imports and re-runs. New hits also appear in the{' '}
-            <a href="/portal" className="text-emerald-700 underline">client portal</a>.
-          </div>
-          <RecentMatches limit={30} />
-        </div>
-      ) : alerts.length === 0 ? (
-        <div className="text-center py-16 border border-dashed rounded-3xl text-gray-400">
-          No alerts yet — create one to start matching Jefferson County inventory.
-        </div>
+      {activeTab === 'matches' ? (
+        <RecentMatches />
       ) : (
         <div className="space-y-3">
-          {alerts.map((alert) => (
-            <div key={alert.id} className="bg-white border rounded-2xl p-5 flex flex-wrap items-start justify-between gap-4 shadow-sm">
+          {showForm && (
+            <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="text-sm font-semibold">
+                {editingAlert ? 'Edit alert' : 'New property alert'}
+              </div>
+              <input
+                className="w-full border rounded-xl px-3 py-2 text-sm"
+                placeholder="Alert name (e.g. Rigby land under 200k)"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
               <div>
-                <div className="font-semibold text-gray-900">{alert.name}</div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {alert.locations.join(', ')} · {alert.propertyTypes.join(', ')}
-                  {alert.maxPrice ? ` · up to $${alert.maxPrice.toLocaleString()}` : ''}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">
-                  Notify:{' '}
-                  {Array.isArray(alert.notifyBy)
-                    ? alert.notifyBy.join(', ')
-                    : String(alert.notifyBy || 'sms')}
-                  {alert.phone ? ` · ${alert.phone}` : ''}
-                  {alert.newConstructionOnly ? ' · new construction only' : ''}
+                <div className="text-xs font-semibold text-slate-500 mb-2">Locations</div>
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  {COUNTIES.map(({ county, locations }) => (
+                    <div key={county}>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                        {county}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {locations.map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => toggleLocation(loc)}
+                            className={`px-2 py-1 text-[11px] rounded-full border ${
+                              form.locations.includes(loc)
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-600'
+                            }`}
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <input
+                  type="number"
+                  className="border rounded-xl px-3 py-2 text-sm"
+                  placeholder="Min price"
+                  value={form.minPrice || ''}
+                  onChange={(e) => setForm({ ...form, minPrice: Number(e.target.value) || 0 })}
+                />
+                <input
+                  type="number"
+                  className="border rounded-xl px-3 py-2 text-sm"
+                  placeholder="Max price"
+                  value={form.maxPrice || ''}
+                  onChange={(e) => setForm({ ...form, maxPrice: Number(e.target.value) || 0 })}
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  className="border rounded-xl px-3 py-2 text-sm"
+                  placeholder="Min acres"
+                  value={form.minAcres || ''}
+                  onChange={(e) => setForm({ ...form, minAcres: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {PROPERTY_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleType(t)}
+                    className={`px-2.5 py-1 text-[11px] rounded-full border ${
+                      form.propertyTypes.includes(t)
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select
+                  className="border rounded-xl px-3 py-2 text-sm"
+                  value={form.notifyBy}
+                  onChange={(e) =>
+                    setForm({ ...form, notifyBy: e.target.value as NotifyChoice })
+                  }
+                >
+                  <option value="sms">SMS first</option>
+                  <option value="email">Email</option>
+                  <option value="both">SMS + Email</option>
+                </select>
+                <input
+                  className="border rounded-xl px-3 py-2 text-sm"
+                  placeholder="Phone for SMS"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.newConstructionOnly}
+                  onChange={(e) =>
+                    setForm({ ...form, newConstructionOnly: e.target.checked })
+                  }
+                />
+                New construction only
+              </label>
               <div className="flex gap-2">
-                <button type="button" onClick={() => handleEdit(alert)} className="px-3 py-1.5 text-sm border rounded-xl hover:bg-gray-50">Edit</button>
-                <button type="button" onClick={() => handleDelete(alert.id)} className="px-3 py-1.5 text-sm border border-rose-200 text-rose-700 rounded-xl hover:bg-rose-50">Delete</button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="btn-primary px-4 py-2 rounded-xl text-sm font-semibold"
+                >
+                  Save alert
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetForm();
+                    setShowForm(false);
+                  }}
+                  className="px-4 py-2 rounded-xl text-sm border"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {alerts.map((a) => (
+            <div
+              key={a.id}
+              className="bg-white border rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div>
+                <div className="font-medium text-slate-900 flex items-center gap-2">
+                  {a.name}
+                  {!a.active && (
+                    <span className="text-[10px] uppercase text-slate-400">Paused</span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {a.locations.join(', ')} ·{' '}
+                  {a.minPrice || a.maxPrice
+                    ? `$${(a.minPrice || 0).toLocaleString()}–$${(a.maxPrice || 0).toLocaleString()}`
+                    : 'Any price'}{' '}
+                  · {a.propertyTypes.join(', ')}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  Notify: {(a.notifyBy || []).join(', ')}
+                  {a.phone ? ` · ${a.phone}` : ''}
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleEdit(a)}
+                  className="px-3 py-1.5 text-xs font-semibold border rounded-lg"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(a.id)}
+                  className="px-3 py-1.5 text-xs font-semibold border border-rose-200 text-rose-700 rounded-lg"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}
+
+          {!loading && alerts.length === 0 && !showForm && (
+            <div className="text-center py-12 text-slate-400 text-sm border rounded-2xl bg-white">
+              No alerts yet — create one to start SMS matching on import.
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function Tab({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-2 text-xs font-semibold rounded-full border ${
+        active ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600'
+      }`}
+    >
+      {label}
+    </button>
   );
 }

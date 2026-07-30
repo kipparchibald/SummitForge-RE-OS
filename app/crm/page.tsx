@@ -11,10 +11,13 @@ import {
   type CrmStage,
 } from '@/lib/crm/store';
 import {
+  deleteContactAsync,
   loadContactsAsync,
+  migrateLocalCrmToCloud,
   saveContactsAsync,
   type CrmStorageMode,
 } from '@/lib/crm/supabase-store';
+import { isBrowserSupabaseConfigured } from '@/lib/auth/browser';
 import { openDealFromContactWithToast } from '@/lib/transaction/actions';
 import NurturePanel from '@/components/crm/NurturePanel';
 import ShowingInbox from '@/components/crm/ShowingInbox';
@@ -39,7 +42,9 @@ export default function CrmPage() {
   const [busy, setBusy] = useState(false);
   const [dealBusy, setDealBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [storageMode, setStorageMode] = useState<CrmStorageMode>('local');
+  const [cloudReady, setCloudReady] = useState(false);
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -50,6 +55,7 @@ export default function CrmPage() {
   });
 
   useEffect(() => {
+    setCloudReady(isBrowserSupabaseConfigured());
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -123,6 +129,36 @@ export default function CrmPage() {
     setSelected(list.find((c) => c.id === id) || null);
   };
 
+  const removeContact = async (id: string) => {
+    if (!confirm('Delete this contact from the pipeline?')) return;
+    const mode = await deleteContactAsync(id);
+    const list = contacts.filter((c) => c.id !== id);
+    setContacts(list);
+    setSelected(null);
+    setStorageMode(mode);
+    toastSuccess('Contact removed');
+  };
+
+  const syncToCloud = async () => {
+    setSyncing(true);
+    try {
+      const result = await migrateLocalCrmToCloud();
+      setStorageMode(result.mode);
+      if (result.error) {
+        toastInfo(result.error);
+      } else if (result.mode === 'cloud') {
+        toastSuccess(`Synced ${result.contacts} contacts to Supabase`);
+        const { contacts: list, mode } = await loadContactsAsync();
+        setContacts(list);
+        setStorageMode(mode);
+      } else {
+        toastInfo('Sign in with Supabase to enable cloud CRM (see /login)');
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const enrollSelected = async (sequenceId: string) => {
     if (!selected) return;
     enrollContact(selected.id, sequenceId);
@@ -137,7 +173,6 @@ export default function CrmPage() {
   const openDeal = async (c: CrmContact) => {
     setDealBusy(true);
     try {
-      // Move pipeline toward under contract if still early
       if (['lead', 'qualified', 'nurture', 'active'].includes(c.stage)) {
         await update(c.id, {
           stage: 'under_contract',
@@ -203,13 +238,41 @@ export default function CrmPage() {
           <p className="text-neutral-500 mt-2 text-sm max-w-xl leading-relaxed">
             Leads, nurture, showings, and active buyers — open a deal when they go under contract.
           </p>
-          <p className="text-[11px] text-neutral-400 mt-2">
-            Storage:{' '}
-            <span className={storageMode === 'cloud' ? 'text-emerald-700 font-medium' : ''}>
-              {storageMode === 'cloud' ? 'Supabase (synced)' : 'This device (sign in for cloud sync)'}
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            <span
+              className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border ${
+                storageMode === 'cloud'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  storageMode === 'cloud' ? 'bg-emerald-500' : 'bg-slate-400'
+                }`}
+              />
+              {storageMode === 'cloud' ? 'Supabase · brokerage synced' : 'This device only'}
+              {loading ? ' · loading…' : ''}
             </span>
-            {loading ? ' · loading…' : ''}
-          </p>
+            {cloudReady && storageMode === 'local' && (
+              <button
+                type="button"
+                onClick={syncToCloud}
+                disabled={syncing}
+                className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border border-slate-300 hover:border-slate-900 disabled:opacity-50"
+              >
+                {syncing ? 'Syncing…' : 'Sync device → cloud'}
+              </button>
+            )}
+            {!cloudReady && (
+              <Link
+                href="/setup"
+                className="text-[11px] text-slate-500 underline underline-offset-2"
+              >
+                Configure Supabase for multi-device CRM
+              </Link>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
           <Link
@@ -272,198 +335,186 @@ export default function CrmPage() {
               className="w-full border rounded-xl px-3 py-2 text-sm"
               placeholder="Name"
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
             <input
               className="w-full border rounded-xl px-3 py-2 text-sm"
               placeholder="Phone"
               value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
             <input
               className="w-full border rounded-xl px-3 py-2 text-sm"
               placeholder="Email"
               value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
             <input
               className="w-full border rounded-xl px-3 py-2 text-sm"
-              placeholder="Interest / needs"
+              placeholder="Interest"
               value={form.interest}
-              onChange={(e) => setForm((f) => ({ ...f, interest: e.target.value }))}
+              onChange={(e) => setForm({ ...form, interest: e.target.value })}
             />
             <div className="grid grid-cols-2 gap-2">
               <input
-                className="border rounded-xl px-3 py-2 text-sm"
-                placeholder="Budget $"
+                className="w-full border rounded-xl px-3 py-2 text-sm"
+                placeholder="Budget"
                 value={form.budget}
-                onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
+                onChange={(e) => setForm({ ...form, budget: e.target.value })}
               />
               <input
-                className="border rounded-xl px-3 py-2 text-sm"
+                className="w-full border rounded-xl px-3 py-2 text-sm"
                 placeholder="Areas"
                 value={form.areas}
-                onChange={(e) => setForm((f) => ({ ...f, areas: e.target.value }))}
+                onChange={(e) => setForm({ ...form, areas: e.target.value })}
               />
             </div>
             <button
               type="button"
-              onClick={() => void addContact()}
-              className="w-full py-2 bg-black text-white rounded-xl text-sm font-medium"
+              onClick={addContact}
+              className="w-full btn-primary py-2 rounded-xl text-sm font-semibold"
             >
-              + Add to pipeline
+              Add to pipeline
             </button>
           </div>
 
-          <ShowingInbox />
-          <NurturePanel />
-
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-            {filtered.length === 0 && (
-              <div className="text-center py-10 text-gray-400 border border-dashed rounded-2xl text-sm">
-                {loading ? 'Loading pipeline…' : 'No contacts in this stage'}
-              </div>
-            )}
+          <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
             {filtered.map((c) => {
-              const stageMeta = CRM_STAGES.find((s) => s.id === c.stage);
+              const stage = CRM_STAGES.find((s) => s.id === c.stage);
               return (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => {
-                    setSelected(c);
-                    setAiReply('');
-                  }}
-                  className={`w-full text-left p-4 rounded-2xl border transition ${
-                    selected?.id === c.id
-                      ? 'border-black bg-gray-50 shadow-sm'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  onClick={() => setSelected(c)}
+                  className={`w-full text-left bg-white border rounded-2xl p-3 shadow-sm hover:border-slate-400 transition ${
+                    selected?.id === c.id ? 'ring-2 ring-slate-900 border-slate-900' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="font-medium text-sm">{c.name}</div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${stageMeta?.color}`}>
-                      {stageMeta?.label}
+                    <div className="font-medium text-sm text-slate-900">{c.name}</div>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage?.color || ''}`}
+                    >
+                      {stage?.label || c.stage}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 line-clamp-2">{c.interest}</div>
-                  <div className="text-[11px] text-gray-400 mt-1">
-                    {money(c.budget)} · {c.areas.join(', ')}
+                  <div className="text-xs text-slate-500 mt-1 line-clamp-2">{c.interest}</div>
+                  <div className="text-[11px] text-slate-400 mt-1.5 flex gap-2">
+                    <span>{money(c.budget)}</span>
+                    <span>·</span>
+                    <span>{c.areas.join(', ') || '—'}</span>
                   </div>
                 </button>
               );
             })}
+            {!loading && filtered.length === 0 && (
+              <div className="text-sm text-slate-400 text-center py-8">No contacts in this stage</div>
+            )}
           </div>
         </div>
 
-        <div className="lg:col-span-2">
-          {!selected ? (
-            <div className="border border-dashed rounded-2xl p-12 text-center text-gray-400 text-sm">
-              Select a contact to manage stage, notes, AI qualify, and open a deal.
-            </div>
-          ) : (
-            <div className="bg-white border rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+        <div className="lg:col-span-2 space-y-4">
+          <ShowingInbox />
+
+          {selected ? (
+            <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-serif font-medium text-neutral-900">
-                    {selected.name}
-                  </h2>
-                  <p className="text-sm text-neutral-500 mt-1">{selected.interest}</p>
-                  <p className="text-xs text-neutral-400 mt-2">
-                    {selected.phone || 'No phone'}
-                    {selected.email ? ` · ${selected.email}` : ''}
-                    {selected.source ? ` · ${selected.source}` : ''}
-                  </p>
+                  <h2 className="text-xl font-semibold tracking-tight">{selected.name}</h2>
+                  <p className="text-sm text-slate-500 mt-1">{selected.interest}</p>
+                  <div className="text-xs text-slate-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                    {selected.phone && <span>{selected.phone}</span>}
+                    {selected.email && <span>{selected.email}</span>}
+                    <span>Score {selected.score ?? '—'}</span>
+                    <span>Source {selected.source || '—'}</span>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={busy}
-                    onClick={() => void qualifyWithAi(selected)}
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-neutral-900 text-white rounded-lg disabled:opacity-50"
+                    onClick={() =>
+                      update(selected.id, { stage: advanceStage(selected.stage) })
+                    }
+                    className="px-3 py-1.5 text-xs font-semibold border rounded-lg hover:bg-slate-50"
                   >
-                    {busy ? 'Qualifying…' : 'AI Qualify'}
+                    Advance stage
                   </button>
                   <button
                     type="button"
+                    onClick={() => qualifyWithAi(selected)}
+                    disabled={busy}
+                    className="px-3 py-1.5 text-xs font-semibold border rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {busy ? 'AI…' : 'AI qualify'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openDeal(selected)}
                     disabled={dealBusy}
-                    onClick={() => void openDeal(selected)}
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-semibold bg-slate-900 text-white rounded-lg hover:bg-black disabled:opacity-50"
                   >
                     {dealBusy ? 'Opening…' : 'Open deal'}
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      void update(selected.id, { stage: advanceStage(selected.stage) })
-                    }
-                    className="px-3 py-2 text-xs font-semibold uppercase tracking-wider border border-neutral-300 rounded-lg"
+                    onClick={() => removeContact(selected.id)}
+                    className="px-3 py-1.5 text-xs font-semibold border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50"
                   >
-                    Advance stage
+                    Delete
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
-                {CRM_STAGES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => void update(selected.id, { stage: s.id })}
-                    className={`text-[11px] px-2.5 py-1 rounded-full border ${
-                      selected.stage === s.id
-                        ? 'border-black bg-black text-white'
-                        : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-
               {aiReply && (
-                <div className="rounded-xl bg-neutral-50 border border-neutral-200 p-3 text-sm text-neutral-700 whitespace-pre-wrap">
+                <div className="text-sm bg-slate-50 border rounded-xl p-3 text-slate-700">
                   {aiReply}
                 </div>
               )}
 
-              {stageSequences.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
-                    Enroll nurture
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {stageSequences.map((seq) => (
-                      <button
-                        key={seq.id}
-                        type="button"
-                        onClick={() => void enrollSelected(seq.id)}
-                        className="px-3 py-1.5 text-xs border border-neutral-300 rounded-lg hover:border-neutral-900"
-                      >
-                        {seq.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-500 mb-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
                   Notes
                 </div>
-                <ul className="space-y-1.5 text-sm text-neutral-600">
+                <ul className="space-y-1.5">
                   {selected.notes.length === 0 && (
-                    <li className="text-neutral-400">No notes yet</li>
+                    <li className="text-sm text-slate-400">No notes yet</li>
                   )}
                   {selected.notes.map((n, i) => (
-                    <li key={i} className="border-l-2 border-neutral-200 pl-3">
+                    <li key={i} className="text-sm text-slate-600 border-l-2 border-slate-200 pl-3">
                       {n}
                     </li>
                   ))}
                 </ul>
               </div>
+
+              {stageSequences.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                    Enroll in nurture
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {stageSequences.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => enrollSelected(s.id)}
+                        className="px-3 py-1.5 text-xs font-medium border rounded-lg hover:border-slate-900"
+                        title={s.description}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white border rounded-2xl p-10 text-center text-slate-400 text-sm shadow-sm">
+              Select a contact to qualify, nurture, or open a deal
             </div>
           )}
+
+          <NurturePanel />
         </div>
       </div>
     </div>
@@ -481,14 +532,14 @@ function Kpi({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-4 ${
-        accent ? 'border-emerald-200 bg-emerald-50/50' : 'border-neutral-200 bg-white'
+      className={`rounded-2xl border p-4 shadow-sm ${
+        accent ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white'
       }`}
     >
-      <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-semibold">
+      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
         {label}
       </div>
-      <div className="text-2xl font-medium mt-1 tabular-nums">{value}</div>
+      <div className="text-2xl font-semibold tracking-tight mt-1 text-slate-900">{value}</div>
     </div>
   );
 }
@@ -508,16 +559,14 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
         active
-          ? 'bg-neutral-900 text-white border-neutral-900'
-          : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-400'
+          ? 'bg-slate-900 text-white border-slate-900'
+          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
       }`}
     >
       {label}
-      <span className={`ml-1.5 tabular-nums ${active ? 'text-neutral-300' : 'text-neutral-400'}`}>
-        {count}
-      </span>
+      <span className={`ml-1.5 ${active ? 'text-slate-300' : 'text-slate-400'}`}>{count}</span>
     </button>
   );
 }
