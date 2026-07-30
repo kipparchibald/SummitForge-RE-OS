@@ -1,17 +1,17 @@
-# SummitForge RE OS - robots.txt
-# Production ready. Adjust as needed for your deployment.
+# Voxli.dev RE OS — robots.txt
+# Domain: https://voxli.dev (update if custom brokerage domain is primary)
 
 User-agent: *
 Allow: /
 
-# Disallow internal APIs and admin-ish paths (even if no auth yet)
+# Disallow internal APIs and private surfaces
 Disallow: /api/
 Disallow: /_next/
 Disallow: /settings/
+Disallow: /login
+Disallow: /auth/
+Disallow: /crm
+Disallow: /transactions
+Disallow: /forms/
 
-# Sitemap
-Sitemap: https://your-domain.com/sitemap.xml
-
-# Notes:
-# - Replace domain after deploy.
-# - In future: add per-tenant disallow if multi-org.
+Sitemap: https://voxli.dev/sitemap.xml

@@ -6,47 +6,47 @@
 
 **Not this product:** IdeaSpeak (`ideaspeak-app`) is a separate voice-first *app builder*. Do not merge IdeaSpeak features or status into this repo.
 
-**Last updated:** July 27, 2026
+**Last updated:** July 30, 2026
 
 ---
 
-## Current Score: **9.1 / 10**
+## Current Score: **9.1 / 10** (demo) → **Sprint 0 in progress** for production
 
-### Done recently
-- **Jefferson owner-of-record** — Node TLS incomplete-chain fix for `gisportal.co.jefferson.id.us`; parcel select returns assessor OWNER, situs, legal acres (`lib/development/parcel.ts`)
-- **Smoke suite** — 151 checks incl. live GIS ownership, offer, nurture SMS, realtime publish, 17 pages
-- **Alerts notifyBy** — form ↔ `('sms'|'email'|'in-app')[]` type alignment; StatusTone re-export
+### Done recently (through July 27)
+- **Jefferson owner-of-record** — Node TLS incomplete-chain fix for `gisportal.co.jefferson.id.us`
+- **Smoke suite** — 151 checks
 - **Offer engine** — win-probability scoring (`/offer`)
 - **Moxi polish** — CMA export PDF, portal showings, nurture panel, realtime + toasts
-- **AI Plat optimizer** — max lots / min roads, double-loaded streets, zoning digest from GIS zone code
-- **GIS → CMA** — select parcel → Send to CMA with aerial + assessor fields
-- **Marketing Agent (approve → deploy)** — Fair Housing checklist, human gate
-- **CMA / CRM / Analytics / Land** — core brokerage loop live
+- **AI Plat optimizer**, **GIS → CMA**, **Marketing Agent (approve → deploy)**
 
-### Verified (this loop)
+### Sprint 0 production foundations (July 30)
+- `docs/SPRINT_0_RUNBOOK.md` — ops checklist for Supabase + Vercel + users
+- `docs/SPRINT_PRODUCTION.md` — full 0–6 sprint board
+- `supabase/APPLY_ORDER.md` + `seed-archibald-bagley.sql`
+- Stricter `validateEnv` + `/api/health` readiness score/gates
+- `npm run prod:checklist`
+- robots/sitemap pointed at **voxli.dev**
+
+### Verified (July 27 loop)
 | Check | Result |
 |-------|--------|
 | `npm run typecheck` | Pass |
 | `SMOKE_BASE_URL=http://localhost:3000 npm run test:smoke` | **151 passed, 0 failed** |
 | GIS Rigby point | Owner + address from Jefferson assessor |
-| GIS PIN RP04N34E360000 | STATE OF IDAHO · legal 560 ac |
-| Feature pages + land-scan + analyze + concept plat | 200 / OK |
 
-### Next (this repo only)
-1. Navica IDX live credentials for production board
-2. Twilio for live nurture SMS (simulated today)
-3. Stripe Checkout sessions (replace demo subscribe buttons)
-4. CRM → Supabase multi-tenant contacts (today: localStorage)
-5. Upstream: Jefferson GIS full LE cert chain (workaround in place)
+### Next (ordered)
+1. **You (ops):** Run Sprint 0 runbook SQL + Vercel env + create users  
+2. **Sprint 1:** Navica IDX live credentials + backfill (`docs/NAVICA-GO-LIVE.md`)  
+3. Twilio for live nurture SMS  
+4. CRM → Supabase multi-tenant contacts (today: localStorage)  
+5. Stripe Checkout sessions  
 
 ---
 
 ## Boundaries
 
-| | SummitForge | IdeaSpeak |
-|--|-------------|-----------|
-| Purpose | RE OS for land / deals / brokerage | Build any app by voice with Grok |
-| Repo | `SummitForge-RE-OS` | `ideaspeak-app` |
-| Work here? | Yes | No — open that repo |
-
-When an agent or human is in this workspace, only change SummitForge.
+| | SummitForge / Voxli RE OS | IdeaSpeak | Split Rock / Voxli construction |
+|--|--------------------------|-----------|----------------------------------|
+| Purpose | RE OS land / deals / brokerage | Build any app by voice | GC job cost / portal |
+| Repo | `SummitForge-RE-OS` | `ideaspeak-app` | `Voxli` / `split-rock-construction` |
+| Work here? | Yes | No | No |
