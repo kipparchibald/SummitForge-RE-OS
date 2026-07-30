@@ -1,5 +1,6 @@
 /**
- * Persistent transaction store (localStorage) with checklist support.
+ * Transaction store — localStorage cache.
+ * Prefer lib/transaction/supabase-store async APIs for multi-device sync.
  */
 
 import type { Transaction } from './coordinator';
@@ -13,6 +14,8 @@ export type StoredTransaction = Transaction & {
   checklist?: ChecklistItem[];
   isLand?: boolean;
   isNewConstruction?: boolean;
+  /** CRM contact id when opened from pipeline */
+  contactId?: string;
 };
 
 export function loadTransactions(): StoredTransaction[] {
@@ -20,7 +23,6 @@ export function loadTransactions(): StoredTransaction[] {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return JSON.parse(raw) as StoredTransaction[];
-    // migrate legacy key
     const legacy = localStorage.getItem('sf_transactions');
     if (legacy) {
       const list = JSON.parse(legacy) as StoredTransaction[];
@@ -45,6 +47,7 @@ export function createStoredTransaction(opts: {
   seller?: string;
   isLand?: boolean;
   isNewConstruction?: boolean;
+  contactId?: string;
 }): StoredTransaction {
   const effectiveDate = new Date().toISOString().slice(0, 10);
   const tx: StoredTransaction = {
@@ -61,6 +64,7 @@ export function createStoredTransaction(opts: {
     notes: [`Opened ${effectiveDate} · ${opts.address}`],
     isLand: opts.isLand,
     isNewConstruction: opts.isNewConstruction,
+    contactId: opts.contactId,
     checklist: buildResidentialChecklist({
       effectiveDate,
       isLand: opts.isLand,

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CRM_STAGES,
   advanceStage,
@@ -14,6 +15,7 @@ import {
   saveContactsAsync,
   type CrmStorageMode,
 } from '@/lib/crm/supabase-store';
+import { openDealFromContactWithToast } from '@/lib/transaction/actions';
 import NurturePanel from '@/components/crm/NurturePanel';
 import ShowingInbox from '@/components/crm/ShowingInbox';
 import {
@@ -29,11 +31,13 @@ const money = (n?: number) =>
     : '—';
 
 export default function CrmPage() {
+  const router = useRouter();
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [selected, setSelected] = useState<CrmContact | null>(null);
   const [filter, setFilter] = useState<CrmStage | 'all'>('all');
   const [aiReply, setAiReply] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dealBusy, setDealBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storageMode, setStorageMode] = useState<CrmStorageMode>('local');
   const [form, setForm] = useState({
@@ -84,7 +88,9 @@ export default function CrmPage() {
 
   const stageSequences: NurtureSequence[] = selected
     ? sequencesForStage(
-        (['lead', 'qualified', 'nurture', 'active', 'under_contract', 'closed'].includes(selected.stage)
+        (['lead', 'qualified', 'nurture', 'active', 'under_contract', 'closed'].includes(
+          selected.stage
+        )
           ? selected.stage
           : 'lead') as NurtureSequence['triggerStage']
       )
@@ -103,8 +109,7 @@ export default function CrmPage() {
       source: 'Manual',
       score: 50,
     });
-    const list = [c, ...contacts];
-    await persist(list);
+    await persist([c, ...contacts]);
     setSelected(c);
     setForm({ name: '', phone: '', email: '', interest: '', budget: '', areas: 'Rigby' });
     toastSuccess(`Lead added: ${c.name}`);
@@ -115,8 +120,7 @@ export default function CrmPage() {
       c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c
     );
     await persist(list);
-    const next = list.find((c) => c.id === id) || null;
-    setSelected(next);
+    setSelected(list.find((c) => c.id === id) || null);
   };
 
   const enrollSelected = async (sequenceId: string) => {
@@ -128,6 +132,23 @@ export default function CrmPage() {
       stage: selected.stage === 'lead' ? 'nurture' : selected.stage,
     });
     toastSuccess(`Enrolled ${selected.name} in “${seqName}”`);
+  };
+
+  const openDeal = async (c: CrmContact) => {
+    setDealBusy(true);
+    try {
+      // Move pipeline toward under contract if still early
+      if (['lead', 'qualified', 'nurture', 'active'].includes(c.stage)) {
+        await update(c.id, {
+          stage: 'under_contract',
+          notes: [...c.notes, 'Opened transaction file from CRM'],
+        });
+      }
+      const tx = await openDealFromContactWithToast(c);
+      router.push(`/transactions?id=${encodeURIComponent(tx.id)}`);
+    } finally {
+      setDealBusy(false);
+    }
   };
 
   const qualifyWithAi = async (c: CrmContact) => {
@@ -180,7 +201,7 @@ export default function CrmPage() {
             CRM
           </h1>
           <p className="text-neutral-500 mt-2 text-sm max-w-xl leading-relaxed">
-            Leads, nurture, showings, and active buyers — linked to alerts, portal, and AI.
+            Leads, nurture, showings, and active buyers — open a deal when they go under contract.
           </p>
           <p className="text-[11px] text-neutral-400 mt-2">
             Storage:{' '}
@@ -226,7 +247,12 @@ export default function CrmPage() {
       </div>
 
       <div className="flex flex-wrap gap-1.5 mb-6">
-        <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={contacts.length} />
+        <FilterChip
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
+          label="All"
+          count={contacts.length}
+        />
         {CRM_STAGES.map((s) => (
           <FilterChip
             key={s.id}
@@ -290,7 +316,6 @@ export default function CrmPage() {
           </div>
 
           <ShowingInbox />
-
           <NurturePanel />
 
           <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
@@ -334,13 +359,15 @@ export default function CrmPage() {
         <div className="lg:col-span-2">
           {!selected ? (
             <div className="border border-dashed rounded-2xl p-12 text-center text-gray-400 text-sm">
-              Select a contact to manage stage, notes, AI qualify, and nurture.
+              Select a contact to manage stage, notes, AI qualify, and open a deal.
             </div>
           ) : (
             <div className="bg-white border rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-serif font-medium text-neutral-900">{selected.name}</h2>
+                  <h2 className="text-xl font-serif font-medium text-neutral-900">
+                    {selected.name}
+                  </h2>
                   <p className="text-sm text-neutral-500 mt-1">{selected.interest}</p>
                   <p className="text-xs text-neutral-400 mt-2">
                     {selected.phone || 'No phone'}
@@ -356,6 +383,14 @@ export default function CrmPage() {
                     className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-neutral-900 text-white rounded-lg disabled:opacity-50"
                   >
                     {busy ? 'Qualifying…' : 'AI Qualify'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={dealBusy}
+                    onClick={() => void openDeal(selected)}
+                    className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50"
+                  >
+                    {dealBusy ? 'Opening…' : 'Open deal'}
                   </button>
                   <button
                     type="button"
