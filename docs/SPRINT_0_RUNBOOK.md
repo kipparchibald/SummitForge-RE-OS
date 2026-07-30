@@ -8,6 +8,17 @@
 
 **Exit criteria:** You can log in, `/api/health` reports `mode: production` + `supabase.schemaOk: true`, demo banner is gone, and one agent account works.
 
+## Production identity
+
+| | |
+|---|---|
+| Vercel | `voxli/summit-forge-re-os` |
+| URL | https://summit-forge-re-os-voxli.vercel.app |
+| Brand | Voxli.dev |
+| Status | **Production ready** (owner-confirmed) |
+
+See `docs/DEPLOYMENT.md`. Do not re-run this runbook unless health regresses.
+
 ---
 
 ## 0. Prerequisites (you)

@@ -8,9 +8,13 @@
 
 **Last updated:** July 30, 2026
 
+**Production:** [summit-forge-re-os-voxli.vercel.app](https://summit-forge-re-os-voxli.vercel.app) · Vercel `voxli/summit-forge-re-os` · brand **Voxli.dev**  
+**Ops status:** Production ready (confirmed by owner). See `docs/DEPLOYMENT.md`.
+
+
 ---
 
-## Current Score: **9.1 / 10** (demo) → **Sprint 0 in progress** for production
+## Current Score: **9.1 / 10** product · **Production ready** (ops)
 
 ### Done recently (through July 27)
 - **Jefferson owner-of-record** — Node TLS incomplete-chain fix for `gisportal.co.jefferson.id.us`
@@ -34,12 +38,12 @@
 | `SMOKE_BASE_URL=http://localhost:3000 npm run test:smoke` | **151 passed, 0 failed** |
 | GIS Rigby point | Owner + address from Jefferson assessor |
 
-### Next (ordered)
-1. **You (ops):** Run Sprint 0 runbook SQL + Vercel env + create users  
-2. **Sprint 1:** Navica IDX live credentials + backfill (`docs/NAVICA-GO-LIVE.md`)  
-3. Twilio for live nurture SMS  
-4. CRM → Supabase multi-tenant contacts (today: localStorage)  
-5. Stripe Checkout sessions  
+### Next (ordered) — net-new product work
+1. **Sprint 1:** Navica IDX live credentials when SRMLS delivers (`docs/NAVICA-GO-LIVE.md`)  
+2. **Sprint 2:** CRM / alerts off localStorage → Supabase RLS  
+3. Twilio live nurture SMS  
+4. Stripe Checkout sessions  
+5. White-label tenant #2  
 
 ---
 
