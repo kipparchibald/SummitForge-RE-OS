@@ -13,6 +13,7 @@ Run in the **Supabase SQL Editor** for the **production** project (and preview D
 | 7 | `migrations/2026-07-30-sprint2-tenant-rls.sql` | **Sprint 2** — tenant RLS, alert phone/email, `crm_activities` |
 | 8 | `seed-archibald-bagley.sql` | First brokerage seed |
 | 9 | `migrations/2026-08-04-emergency-enable-rls-all-public.sql` | **CRITICAL** — enable RLS on all public tables + revoke anon (Supabase security email) |
+| 10 | `migrations/2026-08-29-rise-intent-columns.sql` | **RISE loop** — intent columns on `crm_contacts`, `crm_outreach_drafts`, brokerage RLS |
 
 ### After apply
 

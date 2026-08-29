@@ -21,11 +21,19 @@ import { isBrowserSupabaseConfigured } from '@/lib/auth/browser';
 import { openDealFromContactWithToast } from '@/lib/transaction/actions';
 import NurturePanel from '@/components/crm/NurturePanel';
 import ShowingInbox from '@/components/crm/ShowingInbox';
+import Contact360 from '@/components/crm/Contact360';
 import {
   enrollContact,
   sequencesForStage,
   type NurtureSequence,
 } from '@/lib/nurture/sequences';
+import {
+  loadEnrollmentsAsync,
+  loadShowingsAsync,
+} from '@/lib/crm/supabase-store';
+import { contextBundleForAll } from '@/lib/crm/intent-context';
+import { recordTouch, refreshAllContactIntent } from '@/lib/crm/intent';
+import { loadTransactions } from '@/lib/transaction/store';
 import { toastSuccess, toastInfo } from '@/lib/toast/store';
 
 const money = (n?: number) =>
@@ -45,6 +53,9 @@ export default function CrmPage() {
   const [syncing, setSyncing] = useState(false);
   const [storageMode, setStorageMode] = useState<CrmStorageMode>('local');
   const [cloudReady, setCloudReady] = useState(false);
+  const [showings, setShowings] = useState<import('@/lib/portal/matches').ShowingRequest[]>([]);
+  const [enrollments, setEnrollments] = useState<import('@/lib/nurture/sequences').NurtureEnrollment[]>([]);
+  const [transactions, setTransactions] = useState(loadTransactions());
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -59,9 +70,18 @@ export default function CrmPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { contacts: list, mode } = await loadContactsAsync();
+      const [{ contacts: list, mode }, showRes, enrollRes] = await Promise.all([
+        loadContactsAsync(),
+        loadShowingsAsync(),
+        loadEnrollmentsAsync(),
+      ]);
       if (cancelled) return;
-      setContacts(list);
+      const bundle = contextBundleForAll(showRes.showings, enrollRes.enrollments);
+      const scored = refreshAllContactIntent(list, bundle);
+      setContacts(scored);
+      setShowings(showRes.showings);
+      setEnrollments(enrollRes.enrollments);
+      setTransactions(bundle.transactions);
       setStorageMode(mode);
       setLoading(false);
     })();
@@ -71,8 +91,10 @@ export default function CrmPage() {
   }, []);
 
   const persist = async (list: CrmContact[]) => {
-    setContacts(list);
-    const { mode, error } = await saveContactsAsync(list);
+    const bundle = contextBundleForAll(showings, enrollments);
+    const scored = refreshAllContactIntent(list, bundle);
+    setContacts(scored);
+    const { mode, error } = await saveContactsAsync(scored);
     setStorageMode(mode);
     if (error) {
       toastInfo('Saved on this device — cloud sync failed (check login / CRM schema)');
@@ -122,11 +144,16 @@ export default function CrmPage() {
   };
 
   const update = async (id: string, patch: Partial<CrmContact>) => {
-    const list = contacts.map((c) =>
-      c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c
-    );
-    await persist(list);
-    setSelected(list.find((c) => c.id === id) || null);
+    const merged = contacts.map((c) => {
+      if (c.id !== id) return c;
+      const next = { ...c, ...patch, updatedAt: new Date().toISOString() };
+      if (patch.notes || patch.stage) {
+        return recordTouch(next);
+      }
+      return next;
+    });
+    await persist(merged);
+    setSelected(merged.find((c) => c.id === id) || null);
   };
 
   const removeContact = async (id: string) => {
@@ -276,6 +303,18 @@ export default function CrmPage() {
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
           <Link
+            href="/today"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-orange-300 text-orange-800 hover:border-orange-500"
+          >
+            Today
+          </Link>
+          <Link
+            href="/inbox"
+            className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 hover:border-neutral-900"
+          >
+            Inbox
+          </Link>
+          <Link
             href="/alerts"
             className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold border border-neutral-300 hover:border-neutral-900"
           >
@@ -403,6 +442,14 @@ export default function CrmPage() {
                     <span>{money(c.budget)}</span>
                     <span>·</span>
                     <span>{c.areas.join(', ') || '—'}</span>
+                    {c.score != null && (
+                      <>
+                        <span>·</span>
+                        <span className={c.score >= 70 ? 'text-orange-600 font-semibold' : ''}>
+                          {c.score}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </button>
               );
@@ -417,18 +464,23 @@ export default function CrmPage() {
           <ShowingInbox />
 
           {selected ? (
-            <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight">{selected.name}</h2>
-                  <p className="text-sm text-slate-500 mt-1">{selected.interest}</p>
-                  <div className="text-xs text-slate-400 mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                    {selected.phone && <span>{selected.phone}</span>}
-                    {selected.email && <span>{selected.email}</span>}
-                    <span>Score {selected.score ?? '—'}</span>
-                    <span>Source {selected.source || '—'}</span>
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <Contact360
+                contact={selected}
+                showings={showings}
+                enrollments={enrollments}
+                transactions={transactions}
+                onTouch={async () => {
+                  const touched = recordTouch(selected, 'Logged touch from Contact 360');
+                  await update(selected.id, touched);
+                  toastSuccess('Touch logged — back on your radar');
+                }}
+                onOpenDraft={() => {
+                  router.push(`/inbox?contact=${encodeURIComponent(selected.id)}`);
+                }}
+              />
+
+              <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -463,50 +515,50 @@ export default function CrmPage() {
                     Delete
                   </button>
                 </div>
-              </div>
 
-              {aiReply && (
-                <div className="text-sm bg-slate-50 border rounded-xl p-3 text-slate-700">
-                  {aiReply}
-                </div>
-              )}
+                {aiReply && (
+                  <div className="text-sm bg-slate-50 border rounded-xl p-3 text-slate-700">
+                    {aiReply}
+                  </div>
+                )}
 
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                  Notes
-                </div>
-                <ul className="space-y-1.5">
-                  {selected.notes.length === 0 && (
-                    <li className="text-sm text-slate-400">No notes yet</li>
-                  )}
-                  {selected.notes.map((n, i) => (
-                    <li key={i} className="text-sm text-slate-600 border-l-2 border-slate-200 pl-3">
-                      {n}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {stageSequences.length > 0 && (
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Enroll in nurture
+                    Notes
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {stageSequences.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => enrollSelected(s.id)}
-                        className="px-3 py-1.5 text-xs font-medium border rounded-lg hover:border-slate-900"
-                        title={s.description}
-                      >
-                        {s.name}
-                      </button>
+                  <ul className="space-y-1.5">
+                    {selected.notes.length === 0 && (
+                      <li className="text-sm text-slate-400">No notes yet</li>
+                    )}
+                    {selected.notes.map((n, i) => (
+                      <li key={i} className="text-sm text-slate-600 border-l-2 border-slate-200 pl-3">
+                        {n}
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
-              )}
+
+                {stageSequences.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Enroll in nurture
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {stageSequences.map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => enrollSelected(s.id)}
+                          className="px-3 py-1.5 text-xs font-medium border rounded-lg hover:border-slate-900"
+                          title={s.description}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="bg-white border rounded-2xl p-10 text-center text-slate-400 text-sm shadow-sm">
