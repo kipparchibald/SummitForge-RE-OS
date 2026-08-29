@@ -84,6 +84,14 @@ export default function CrmPage() {
       setTransactions(bundle.transactions);
       setStorageMode(mode);
       setLoading(false);
+      if (typeof window !== 'undefined') {
+        const pick = sessionStorage.getItem('sf_crm_select');
+        if (pick) {
+          sessionStorage.removeItem('sf_crm_select');
+          const found = scored.find((c) => c.id === pick);
+          if (found) setSelected(found);
+        }
+      }
     })();
     return () => {
       cancelled = true;
