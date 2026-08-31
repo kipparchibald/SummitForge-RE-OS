@@ -1,5 +1,5 @@
 import { parse as parseCSV } from 'papaparse';
-import { fetchArchibaldNavicaListings } from './navica';
+import { fetchPreferredMlsListings } from './listings-brokerage-hook';
 import { fetchSiteListings } from './idxSite';
 import { setRecentListings } from './recentListings';
 import { saveListings } from '../supabase/client';
@@ -92,10 +92,9 @@ export async function importListings(
     return result;
   }
 
-  // Special live Navica mode
+  // Special live Navica mode — brokerage public IDX first (no MLS login).
   if (input === 'live-navica' || source === 'navica') {
-    // Full MLS board (all property types) — pass landOnly:true only for land-engine tools
-    const navicaResult = await fetchArchibaldNavicaListings(200, { landOnly: false });
+    const navicaResult = await fetchPreferredMlsListings(200, { landOnly: false });
     const result: ImportResult = {
       imported: navicaResult.count,
       landCount: navicaResult.landCount,
@@ -184,7 +183,6 @@ export async function importListings(
   };
 }
 
-// Property-alert matching pipeline (SMS-first) over freshly imported listings
 async function runAlertMatching(
   normalized: NormalizedListing[],
   alerts: Alert[]
@@ -207,7 +205,6 @@ async function runAlertMatching(
   const matches: any[] = [];
   for (const listing of alertListings) {
     const listingMatches = findMatchesForListing(listing, alerts);
-    // Prefer SMS channel on match when alert wants SMS
     for (const m of listingMatches) {
       const alert = alerts.find(a => a.id === m.alertId);
       if (alert?.notifyBy.includes('sms')) {
@@ -281,15 +278,8 @@ function mapPropertyType(type: string): any {
 
 async function triggerRawLandProjection(listing: NormalizedListing) {
   console.log(`Triggering raw land projection for: ${listing.address}`);
-  // Integrate with your lib/analysis/raw-land.ts
-  // Example: await runRawLandProjection({ ...listing, zoning: 'R-1' /* from GIS */ });
-  // This will calculate lot yield, infra estimates, IRR etc.
 }
 
-/**
- * Simple JS Levenshtein distance for fuzzy search scoring.
- * Used for deeper client-side fuzzy matching in import page + search.
- */
 export function levenshtein(a: string, b: string): number {
   const s = a.toLowerCase();
   const t = b.toLowerCase();
@@ -305,42 +295,32 @@ export function levenshtein(a: string, b: string): number {
     for (let j = 1; j <= n; j++) {
       const cost = s[i - 1] === t[j - 1] ? 0 : 1;
       dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,      // deletion
-        dp[i][j - 1] + 1,      // insertion
-        dp[i - 1][j - 1] + cost // substitution
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
       );
     }
   }
   return dp[m][n];
 }
 
-/**
- * Fuzzy score 0-1 (1=perfect) using Levenshtein + substring boost.
- * Simple, no deps. Supports MLS # exact/near, address, description partials.
- */
 export function fuzzyScore(query: string, target: string): number {
   if (!query || !target) return 0;
   const q = query.trim().toLowerCase();
   const t = target.toLowerCase();
   if (!q) return 0;
-  if (t.includes(q)) return 0.95; // strong substring boost
+  if (t.includes(q)) return 0.95;
   if (q.includes(t)) return 0.85;
   const dist = levenshtein(q, t);
   const maxLen = Math.max(q.length, t.length);
   if (maxLen === 0) return 0;
   let score = 1 - dist / maxLen;
-  // MLS # boost: if both look numeric/MLS-ish
   const qLooksMls = /^\d{4,}$/.test(q.replace(/[^0-9]/g, ''));
   const tLooksMls = /\d{4,}/.test(t);
   if (qLooksMls && tLooksMls && dist <= 2) score = Math.max(score, 0.92);
   return Math.max(0, Math.min(1, score));
 }
 
-/**
- * Filter + score listings with fuzzy search.
- * Combines includes (for speed) + Levenshtein fuzzy score.
- * New usage: for import page live search and queryListings post-processing.
- */
 export function fuzzyFilterListings<T extends { address: string; description?: string; externalId?: string; propertyType?: string }>(
   listings: T[],
   searchTerm: string,
@@ -359,7 +339,6 @@ export function fuzzyFilterListings<T extends { address: string; description?: s
         l.propertyType || ''
       ].join(' ');
       const score = fuzzyScore(q, fields);
-      // Extra MLS specific: direct external match
       if (l.externalId && fuzzyScore(q, String(l.externalId)) > score) {
         return { ...l, _score: fuzzyScore(q, String(l.externalId)) };
       }
