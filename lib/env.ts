@@ -52,6 +52,7 @@ export const ENV_REQUIREMENTS = {
     'CRON_SECRET',
   ],
   recommendedForProd: [
+    'ARCHIBALD_LISTINGS_URL',
     'NAVICA_IDX_URL',
     'NAVICA_API_KEY',
     'NEXT_PUBLIC_COMPANY_NAME',
@@ -84,7 +85,7 @@ export function validateEnv(): EnvValidationResult {
 
   // Core public (maps + AI)
   if (
-    isPlaceholder(process.env.NEXT_PUBLIC_MAPBOX_TOKEN, [/pk\.your/i])
+    isPlaceholder(process.env.NEXT_PUBLIC_MAPBOX_TOKEN, [/pk\\.your/i])
   ) {
     push(
       'NEXT_PUBLIC_MAPBOX_TOKEN missing or placeholder — maps use demo fallback',
@@ -134,10 +135,13 @@ export function validateEnv(): EnvValidationResult {
     if (!isDemo) missing.push('SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  // Navica / real data — Sprint 1; warn only until credentials land
-  if (isPlaceholder(process.env.NAVICA_IDX_URL) || isPlaceholder(process.env.NAVICA_API_KEY)) {
+  // Listings feed — brokerage live API is preferred; direct Navica is fallback
+  const hasBrokerageFeed = !isPlaceholder(process.env.ARCHIBALD_LISTINGS_URL);
+  const hasDirectNavica =
+    !isPlaceholder(process.env.NAVICA_IDX_URL) && !isPlaceholder(process.env.NAVICA_API_KEY);
+  if (!hasBrokerageFeed && !hasDirectNavica) {
     push(
-      'NAVICA_IDX_URL / NAVICA_API_KEY not set — using high-quality Eastern Idaho demo listings',
+      'No ARCHIBALD_LISTINGS_URL or NAVICA_* keys — importer will try https://www.archibaldbagley.com/api/listings/live then demo fallback',
       'warn',
     );
   }
@@ -169,9 +173,9 @@ export function validateEnv(): EnvValidationResult {
         'Production: set NEXT_PUBLIC_COMPANY_NAME (and brand colors/phone) for Archibald-Bagley first paint',
       );
     }
-    if (isPlaceholder(process.env.NAVICA_IDX_URL)) {
+    if (!hasBrokerageFeed && isPlaceholder(process.env.NAVICA_IDX_URL)) {
       warnings.push(
-        'PRODUCTION: Real Navica IDX recommended before client go-live (Sprint 1) — demo board still active',
+        'PRODUCTION: Point ARCHIBALD_LISTINGS_URL at archibaldbagley.com /api/listings/live (or set NAVICA_*) before client go-live',
       );
     }
   }
@@ -179,7 +183,7 @@ export function validateEnv(): EnvValidationResult {
   // Readiness score: foundations vs later sprints
   let readinessScore = 0;
   if (!isDemo) readinessScore += 15;
-  if (!isPlaceholder(process.env.NEXT_PUBLIC_MAPBOX_TOKEN, [/pk\.your/i])) readinessScore += 10;
+  if (!isPlaceholder(process.env.NEXT_PUBLIC_MAPBOX_TOKEN, [/pk\\.your/i])) readinessScore += 10;
   if (hasXai || hasOpenAI) readinessScore += 10;
   if (
     supabaseUrl &&
@@ -191,7 +195,7 @@ export function validateEnv(): EnvValidationResult {
   if (!isPlaceholder(process.env.SUPABASE_SERVICE_ROLE_KEY)) readinessScore += 10;
   if (!isPlaceholder(process.env.CRON_SECRET)) readinessScore += 10;
   if (!isPlaceholder(process.env.NEXT_PUBLIC_COMPANY_NAME)) readinessScore += 5;
-  if (!isPlaceholder(process.env.NAVICA_IDX_URL) && !isPlaceholder(process.env.NAVICA_API_KEY)) {
+  if (hasBrokerageFeed || (!isPlaceholder(process.env.NAVICA_IDX_URL) && !isPlaceholder(process.env.NAVICA_API_KEY))) {
     readinessScore += 10;
   }
   if (
