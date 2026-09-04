@@ -27,6 +27,14 @@ export type CrmContact = {
   createdAt: string;
   updatedAt: string;
   score?: number;
+  /** Last agent touch (call, text, note) — drives recency signal */
+  lastTouchedAt?: string;
+  /** Top intent signal copy for today queue / 360 */
+  intentReason?: string;
+  /** Hide from /today until this instant (America/Boise snooze) */
+  snoozedUntil?: string;
+  /** Dismissed from queue until next touch clears it */
+  dismissedAt?: string;
 };
 
 const KEY = 'sf_crm_contacts';

@@ -50,6 +50,8 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'pipeline',
     label: 'Pipeline',
     items: [
+      { href: '/today', label: 'Today', hint: "Don't miss", highlight: true },
+      { href: '/inbox', label: 'Outreach Inbox', hint: 'Drafts' },
       { href: '/crm', label: 'CRM Pipeline' },
       { href: '/transactions', label: 'Transactions' },
       { href: '/forms', label: 'Idaho Forms & E-Sign' },
@@ -94,6 +96,8 @@ const ICONS: Record<string, string> = {
   '/monitoring': '⌖',
   '/reports/land-analysis': '☰',
   '/crm': '◎',
+  '/today': '★',
+  '/inbox': '✉',
   '/transactions': '→',
   '/forms': '✎',
   '/mortgage': '%',
