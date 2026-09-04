@@ -1,30 +1,37 @@
-// Lead Qualifier Agent - World-class, empathetic qualification for real estate
-
 import { callLLM, SYSTEM_PROMPTS } from './client';
+import { scoreContact } from '@/lib/crm/predict-score';
+import type { CrmContact } from '@/lib/crm/store';
 
 export class LeadQualifier {
   async qualify(leadInfo: any) {
-    const prompt = `Lead info: ${JSON.stringify(leadInfo)}
-
-As a world-class lead qualifier for raw land in Idaho:
-- Assess readiness (timeline, budget, vision)
-- Identify pain points and motivations
-- Suggest personalized next steps
-- Draft a warm follow-up message
-
-Respond in a friendly yet professional tone focused on helping them find the right fit.`;
-
-    const aiResponse = await callLLM(SYSTEM_PROMPTS.lead || 'You are an expert real estate lead assistant.', prompt);
-
+    const now = new Date().toISOString();
+    const contact: CrmContact = {
+      id: leadInfo?.id || 'tmp',
+      name: leadInfo?.name || 'Lead',
+      email: leadInfo?.email,
+      phone: leadInfo?.phone,
+      stage: leadInfo?.stage || 'lead',
+      interest: leadInfo?.interest || '',
+      budget: leadInfo?.budget,
+      areas: leadInfo?.areas || (leadInfo?.area ? [leadInfo.area] : []),
+      source: leadInfo?.source,
+      notes: leadInfo?.notes || [],
+      createdAt: leadInfo?.createdAt || now,
+      updatedAt: leadInfo?.updatedAt || now,
+    };
+    const score = scoreContact(contact);
+    const prompt = `Lead: ${JSON.stringify(leadInfo)}
+Score ${score.total} (${score.band}). Sequence ${score.recommendedSequenceId}.
+Write a one-sentence read, two pain points, and an SMS under 160 characters with STOP. Eastern Idaho voice. No hype.`;
+    const aiResponse = await callLLM(SYSTEM_PROMPTS.lead || 'You are an expert real estate lead assistant for Eastern Idaho.', prompt);
     return {
-      qualificationScore: Math.floor(Math.random() * 40) + 60,
+      qualificationScore: score.total,
+      band: score.band,
+      recommendedSequenceId: score.recommendedSequenceId,
+      breakdown: score,
       insights: aiResponse,
-      recommendedActions: [
-        'Schedule discovery call',
-        'Send tailored lot recommendations',
-        'Invite to virtual land tour'
-      ],
-      lastUpdated: new Date().toISOString()
+      recommendedActions: [`Enroll in ${score.recommendedSequenceId}`, score.band === 'hot' ? 'Call today' : 'Text first'],
+      lastUpdated: now,
     };
   }
 }
