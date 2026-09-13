@@ -52,6 +52,10 @@ function rowToContact(row: Record<string, unknown>): CrmContact {
     source: row.source ? String(row.source) : undefined,
     notes: Array.isArray(row.notes) ? (row.notes as string[]) : [],
     score: row.score != null ? Number(row.score) : undefined,
+    lastTouchedAt: row.last_touched_at ? String(row.last_touched_at) : undefined,
+    intentReason: row.intent_reason ? String(row.intent_reason) : undefined,
+    snoozedUntil: row.snoozed_until ? String(row.snoozed_until) : undefined,
+    dismissedAt: row.dismissed_at ? String(row.dismissed_at) : undefined,
     createdAt: String(row.created_at || new Date().toISOString()),
     updatedAt: String(row.updated_at || new Date().toISOString()),
   };
@@ -72,6 +76,10 @@ function contactToRow(c: CrmContact, userId: string, brokerageId: string) {
     source: c.source ?? null,
     notes: c.notes || [],
     score: c.score ?? null,
+    last_touched_at: c.lastTouchedAt ?? null,
+    intent_reason: c.intentReason ?? null,
+    snoozed_until: c.snoozedUntil ?? null,
+    dismissed_at: c.dismissedAt ?? null,
     created_at: c.createdAt,
     updated_at: c.updatedAt,
   };
